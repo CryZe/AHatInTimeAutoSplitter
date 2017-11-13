@@ -84,7 +84,7 @@ start {
 }
 
 split {
-    return vars.timePieceCount.Current > vars.timePieceCount.Old || vars.timerState.Current == 2;
+    return (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 && vars.actTimerIsVisible.Current == 1) || vars.timerState.Current == 2;
 }
 
 reset {
