@@ -1,6 +1,21 @@
-state("HatinTimeGame") {}
+state("HatinTimeGame", "DLC 2.1") {
+    int chapter : 0x011E1570, 0x68, 0x108;
+}
+
+state("HatinTimeGame", "110% Patch") {
+    int chapter : 0x0121F280, 0x68, 0x108;
+}
+
+state("HatinTimeGame", "DLC 1.5") {
+	int chapter: 0x011E7550, 0x68, 0x108;
+}
+
+state("HatinTimeGame", "Modding") {
+	int chapter : 0x011475A8, 0x64, 0xF8;
+}
 
 startup {
+
     vars.scanTarget = new SigScanTarget(0,
         "54 49 4D 52", // TIMR
         "?? ?? ?? ??", // timerState
@@ -17,9 +32,48 @@ startup {
         "?? ?? ?? ??", // timePieceCount
         "45 4E 44 20" // END
     );
+
+    settings.Add("splits", true, "Splits");
+    settings.CurrentDefaultParent = "splits";
+    settings.Add("splits_tp", true, "Time Pieces");
+    settings.Add("splits_tp_new", true, "New Time Pieces", "splits_tp");
+    settings.Add("splits_tp_any", true, "Any Time Piece", "splits_tp");
+    settings.SetToolTip("splits_tp_any", "This adds repeated time pieces and death wish time pieces but may not trigger under certain conditions.\nRecommended to use with \"New Time Pieces\".");
+    settings.Add("splits_tp_std", true, "Seal The Deal", "splits_tp");
+    settings.SetToolTip("splits_tp_std", "End of Death Wish Any%.\nOnly works on detected patches.");
+    settings.Add("splits_dwbth", false, "Death Wish Level Back to Hub");
+    settings.SetToolTip("splits_dwbth", "Only works on detected patches.");
+    settings.CurrentDefaultParent = null;
+
+    settings.Add("settings", true, "Settings");
+    settings.CurrentDefaultParent = "settings";
+    settings.Add("IL_mode", false, "IL Mode - Follow the act timer instead of the game timer");
+    settings.SetToolTip("IL_mode", "This will also start the timer when the act timer is at 0, and reset when using \"restartil\" or exiting a level.");
+    settings.Add("settings_new_file_start", true, "Only start the timer when opening an empty file");
+    settings.Add("game_time_message", true, "Ask if Game Time should be used when the game opens");
+
+    vars.lastChapter = 0; // used by seal the deal split
 }
 
 init {
+
+    if (timer.CurrentTimingMethod == TimingMethod.RealTime && settings["game_time_message"]){
+		var message = MessageBox.Show(
+			"Would you like to change the current timing method to\nGame Time instead of Real Time?", 
+			"LiveSplit | A Hat in Time Auto Splitter", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+			
+	    if (message == DialogResult.Yes)
+			timer.CurrentTimingMethod = TimingMethod.GameTime;
+	}
+
+	switch (modules.First().ModuleMemorySize) {
+        case 0x13AF000: version = "DLC 2.1"; break;
+        case 0x13F0000: version = "110% Patch"; break;
+		case 0x13B3000: version = "DLC 1.5"; break;
+		case 0x1260000: version = "Modding"; break;
+        default: version = "Undetected"; break;
+    }
+
     var ptr = IntPtr.Zero;
 
     foreach (var page in game.MemoryPages(true)) {
@@ -77,18 +131,30 @@ init {
 
 update {
     vars.watchers.UpdateAll(game);
+    if (version != "Undetected" && current.chapter != old.chapter){
+        vars.lastChapter = old.chapter;
+    }
 }
 
 start {
-    return vars.timerState.Current == 1 && vars.timerState.Old == 0;
+    return (settings["settings_new_file_start"] && vars.timerState.Current == 1 && vars.timerState.Old == 0 && vars.timePieceCount.Current == 0)
+        || (!settings["settings_new_file_start"] && vars.timerState.Current == 1 && vars.timerState.Old == 0)
+        || (settings["IL_mode"] && vars.actTimerIsVisible.Current == 1 && vars.realActTime.Current == 0);
 }
 
 split {
-    return vars.timePieceCount.Current == vars.timePieceCount.Old + 1;
+    if (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 && settings["splits_tp_new"] ||
+        vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && settings["splits_tp_any"] ||
+        version != "Undetected" && vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"] ||
+        current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"]){
+            return true;
+        }
+
+    return false;
 }
 
 reset {
-    return vars.timerState.Current == 0 && vars.timerState.Old == 1;
+    return vars.timerState.Current == 0 && vars.timerState.Old == 1 || settings["IL_mode"] && (vars.actTimerIsVisible.Current == 0 && vars.actTimerIsVisible.Old == 1 || vars.realActTime.Current < vars.realActTime.Old);
 }
 
 isLoading {
@@ -96,5 +162,5 @@ isLoading {
 }
 
 gameTime {
-	return TimeSpan.FromSeconds(vars.realGameTime.Current);
+	return settings["IL_mode"] ? TimeSpan.FromSeconds(vars.realActTime.Current) : TimeSpan.FromSeconds(vars.realGameTime.Current);
 }
