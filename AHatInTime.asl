@@ -99,8 +99,9 @@ init {
             "Would you like to change the current timing method to\nGame Time instead of Real Time?", 
             "LiveSplit | A Hat in Time Auto Splitter", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
-        if (message == DialogResult.Yes)
+        if (message == DialogResult.Yes){
             timer.CurrentTimingMethod = TimingMethod.GameTime;
+        }
     }
 
     switch (modules.First().ModuleMemorySize) {
@@ -186,10 +187,14 @@ start {
 }
 
 split {
+    if (vars.timerState.Current == 0){
+        return false;
+    }
+
     if (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 && (settings["splits_tp_new"] || (version != "Undetected" && settings["manySplits_" + current.chapter + "_" + current.act + "_tp"])) ||
         vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && (settings["splits_tp_any"] || (version != "Undetected" && settings["manySplits_" + current.chapter + "_" + current.act + "_tp"]))||
         version != "Undetected" && vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"] ||
-        current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"] ||
+        version != "Undetected" && current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"] ||
         vars.splitInLoadScreen && vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0){
             return true;
         }
