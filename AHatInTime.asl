@@ -7,11 +7,11 @@ state("HatinTimeGame", "110% Patch") {
 }
 
 state("HatinTimeGame", "DLC 1.5") {
-	int chapter: 0x011E7550, 0x68, 0x108;
+    int chapter: 0x011E7550, 0x68, 0x108;
 }
 
 state("HatinTimeGame", "Modding") {
-	int chapter : 0x011475A8, 0x64, 0xF8;
+    int chapter : 0x011475A8, 0x64, 0xF8;
 }
 
 startup {
@@ -58,19 +58,20 @@ startup {
 init {
 
     if (timer.CurrentTimingMethod == TimingMethod.RealTime && settings["game_time_message"]){
-		var message = MessageBox.Show(
-			"Would you like to change the current timing method to\nGame Time instead of Real Time?", 
-			"LiveSplit | A Hat in Time Auto Splitter", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-			
-	    if (message == DialogResult.Yes)
-			timer.CurrentTimingMethod = TimingMethod.GameTime;
-	}
+        var message = MessageBox.Show(
+            "Would you like to change the current timing method to\nGame Time instead of Real Time?", 
+            "LiveSplit | A Hat in Time Auto Splitter", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
-	switch (modules.First().ModuleMemorySize) {
+        if (message == DialogResult.Yes){
+            timer.CurrentTimingMethod = TimingMethod.GameTime;
+        }
+    }
+
+    switch (modules.First().ModuleMemorySize) {
         case 0x13AF000: version = "DLC 2.1"; break;
         case 0x13F0000: version = "110% Patch"; break;
-		case 0x13B3000: version = "DLC 1.5"; break;
-		case 0x1260000: version = "Modding"; break;
+        case 0x13B3000: version = "DLC 1.5"; break;
+        case 0x1260000: version = "Modding"; break;
         default: version = "Undetected"; break;
     }
 
@@ -109,8 +110,8 @@ init {
     vars.justGotTimePiece = new MemoryWatcher<int>(ptr + 0x20);
     vars.gameTime = new MemoryWatcher<double>(ptr + 0x24);
     vars.actTime = new MemoryWatcher<double>(ptr + 0x2C);
-	vars.realGameTime = new MemoryWatcher<double>(ptr + 0x34);
-	vars.realActTime = new MemoryWatcher<double>(ptr + 0x3C);
+    vars.realGameTime = new MemoryWatcher<double>(ptr + 0x34);
+    vars.realActTime = new MemoryWatcher<double>(ptr + 0x3C);
     vars.timePieceCount = new MemoryWatcher<int>(ptr + 0x44);
 
     vars.watchers = new MemoryWatcherList() {
@@ -123,8 +124,8 @@ init {
         vars.justGotTimePiece,
         vars.gameTime,
         vars.actTime,
-		vars.realGameTime,
-		vars.realActTime,
+        vars.realGameTime,
+        vars.realActTime,
         vars.timePieceCount
     };
 }
@@ -143,10 +144,14 @@ start {
 }
 
 split {
+    if (vars.timerState.Current == 0){
+        return false;
+    }
+
     if (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 && settings["splits_tp_new"] ||
         vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && settings["splits_tp_any"] ||
         version != "Undetected" && vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"] ||
-        current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"]){
+        version != "Undetected" && current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"]){
             return true;
         }
 
@@ -162,5 +167,5 @@ isLoading {
 }
 
 gameTime {
-	return settings["IL_mode"] ? TimeSpan.FromSeconds(vars.realActTime.Current) : TimeSpan.FromSeconds(vars.realGameTime.Current);
+    return settings["IL_mode"] ? TimeSpan.FromSeconds(vars.realActTime.Current) : TimeSpan.FromSeconds(vars.realGameTime.Current);
 }
