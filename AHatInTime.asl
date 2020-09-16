@@ -1,3 +1,5 @@
+// TODO: cp, cp_pause, cp_pause_pos, decide what to do with pos splits (alpine and slap), test act entries, add all rift splits
+
 state("HatinTimeGame", "DLC 2.1") {
     int chapter : 0x011E1570, 0x68, 0x108;
     int act : 0x011E1570, 0x68, 0x10C;
@@ -37,6 +39,14 @@ startup {
         "45 4E 44 20" // END
     );
 
+    settings.Add("settings", true, "Settings");
+    settings.CurrentDefaultParent = "settings";
+    settings.Add("IL_mode", false, "IL Mode - Follow the act timer instead of the game timer");
+    settings.SetToolTip("IL_mode", "This will also start the timer when the act timer is at 0, and reset when using \"restartil\" or exiting a level.");
+    settings.Add("settings_new_file_start", true, "Only start the timer when opening an empty file");
+    settings.Add("game_time_message", true, "Ask if Game Time should be used when the game opens");
+
+    settings.CurrentDefaultParent = null;
     settings.Add("splits", true, "Splits");
     settings.CurrentDefaultParent = "splits";
     settings.Add("splits_tp", true, "Time Pieces");
@@ -68,29 +78,73 @@ startup {
         for (int i = 1; i <= 7; i++){
             if ((j <= 4) && string.Compare(actNames[j-1, i-1], "") != 0){
                 settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i, true, actNames[j-1, i-1], "manySplits_" + (j == 4 ? 6 : j));
-                settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i + "_tp", true, "Time Piece", "manySplits_" + (j == 4 ? 6 : j) + "_" + i);
-                settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i + "_tpDelayed", false, "Load Screen After Getting Time Piece", "manySplits_" + (j == 4 ? 6 : j) + "_" + i);
+                settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i + "_entry", false, "Telescope Entry", "manySplits_" + (j == 4 ? 6 : j) + "_" + i);
             }
             else {
-                continue;
+                i = 8;
             }
         }
         if (j == 4 || j == 5 || j == 7){
-            settings.Add("manySplits_" + j + "_tp", true, "Time Pieces", "manySplits_" + j);
+            settings.Add("manySplits_" + j + "_entry", false, "Telescope Entry", "manySplits_" + j);
         }
     }
 
-    settings.CurrentDefaultParent = null;
-    settings.Add("settings", true, "Settings");
-    settings.CurrentDefaultParent = "settings";
-    settings.Add("IL_mode", false, "IL Mode - Follow the act timer instead of the game timer");
-    settings.SetToolTip("IL_mode", "This will also start the timer when the act timer is at 0, and reset when using \"restartil\" or exiting a level.");
-    settings.Add("settings_new_file_start", true, "Only start the timer when opening an empty file");
-    settings.Add("game_time_message", true, "Ask if Game Time should be used when the game opens");
+    settings.Add("manySplits_1_1_cp1", false, "Umbrella Fight", "manySplits_1_1");
+    settings.Add("manySplits_1_2_cp1", false, "Battle Start", "manySplits_1_2");
+    settings.Add("manySplits_1_3_cp1", false, "Scare", "manySplits_1_3");
+    settings.Add("1_4_cp0_pause_pos", false, "Enter HQ", "manySplits_1_4");
+    settings.Add("manySplits_1_4_cp1", false, "Vent", "manySplits_1_4");
+    settings.Add("manySplits_1_4_cp2", false, "Boss", "manySplits_1_4");
+    settings.Add("manySplits_1_6_cp59_pause", false, "Death", "manySplits_1_6");
+    settings.SetToolTip("manySplits_1_6_cp59_pause", "Make sure you are doing on of the ice hat routes for this to work.");
+
+    settings.Add("manySplits_2_1_cp5", false, "Warp Exploit", "manySplits_2_1");
+    settings.Add("manySplits_2_4_cp1", false, "Intro", "manySplits_2_4");
+    settings.Add("manySplits_2_4_cp4", false, "Exit to Roof", "manySplits_2_4");
+    settings.Add("manySplits_2_5_cp1", false, "Intro", "manySplits_2_5");
+    settings.Add("manySplits_2_5_cp2", false, "Waiting Time #1", "manySplits_2_5");
+    settings.Add("manySplits_2_5_cp3", false, "Waiting Time #2", "manySplits_2_5");
+    settings.SetToolTip("manySplits_2_6", "This is for the fake and real finale time pieces / entries.");
+    settings.Add("manySplits_2_6_cp0_pause_pos", false, "Elevator to Boss", "manySplits_2_6");
+
+    settings.Add("manySplits_3_2_cp0_pause_pos", false, "Inside Well", "manySplits_3_2");
+    settings.Add("manySplits_3_3_cp1", false, "Fight Start", "manySplits_3_3");
+    settings.Add("manySplits_3_4_cp0_pause_pos", false, "Inside Manor", "manySplits_3_4");
+    settings.Add("manySplits_3_6_cp1", false, "Fight Start", "manySplits_3_6");
+
+    settings.Add("manySplits_4_99_cp0_pause_pos", false, "Intro End", "manySplits_4");
+    settings.SetToolTip("manySplits_4_99_cp0_pause_pos", "Triggered when going back to hub right after the screen fades to white in the zipline.");
+
+    settings.Add("manySplits_5_1_cp10", false, "Hyper Zone", "manySplits_5");
+
+    settings.Add("manySplits_6_1_cp3", false, "Check-in", "manySplits_6_1");
+    settings.Add("manySplits_6_2_cp1", false, "Job Start", "manySplits_6_2");
+    settings.Add("manySplits_6_3_cp1", false, "Sink the Boat", "manySplits_6_3");
+    settings.Add("manySplits_6_3_cp2", false, "First Group Saved", "manySplits_6_3");
+    settings.Add("manySplits_6_3_cp3", false, "Second Group Saved", "manySplits_6_3");
+
+    // insert rift splits here
+
+    for (int j = 1; j <= 7; j++){
+        for (int i = 1; i <= 7; i++){
+            if ((j <= 4) && string.Compare(actNames[j-1, i-1], "") != 0){
+                settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i + "_tp", true, "Time Piece", "manySplits_" + (j == 4 ? 6 : j) + "_" + i);
+                settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i + "_tpDelayed", false, "Delayed Time Piece", "manySplits_" + (j == 4 ? 6 : j) + "_" + i);
+                settings.SetToolTip("manySplits_" + (j == 4 ? 6 : j) + "_" + i + "_tpDelayed", "This triggers on the loading screen after getting the time piece.");
+            }
+            else {
+                i = 8;
+            }
+        }
+        if (j == 4 || j == 5 || j == 7){
+            settings.Add("manySplits_" + j + "_tp", true, "Time Piece" + (j == 5 ? "" : "s"), "manySplits_" + j);
+        }
+    }
 
     vars.lastChapter = 0; // used by seal the deal split
     vars.splitInLoadScreen = false;
-}
+    vars.splitsLock = false; // locks splits, prevents multiple splits on loading screens
+    }
 
 init {
 
@@ -177,6 +231,7 @@ update {
     }
     if (vars.gameTimerIsPaused.Current == 0 && vars.gameTimerIsPaused.Old == 1){
         vars.splitInLoadScreen = false;
+        vars.splitsLock = false;
     }
 }
 
@@ -187,18 +242,40 @@ start {
 }
 
 split {
-    if (vars.timerState.Current == 0){
-        return false;
-    }
-
-    if (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 && (settings["splits_tp_new"] || (version != "Undetected" && settings["manySplits_" + current.chapter + "_" + current.act + "_tp"])) ||
-        vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && (settings["splits_tp_any"] || (version != "Undetected" && settings["manySplits_" + current.chapter + "_" + current.act + "_tp"]))||
-        version != "Undetected" && vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"] ||
-        version != "Undetected" && current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"] ||
-        vars.splitInLoadScreen && vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0){
+    if (vars.timerState.Current != 0 && !vars.splitsLock
+        &&
+        (
+        settings["splits"] 
+            &&
+            (
+            vars.timePieceCount.Current == vars.timePieceCount.Old + 1 && settings["splits_tp_new"]  // new time piece
+            ||
+            vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && settings["splits_tp_any"]  // any time piece
+            ||
+            vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && version != "Undetected" && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"]  // seal the deal
+            ||
+            version != "Undetected" && current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"]  // death wish back to hub
+            )
+        ||
+        settings["manySplits"] && version != "Undetected" 
+            &&
+            (
+            (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && (settings["manySplits_" + current.chapter + "_" + current.act + "_tp"] || settings["manySplits_" + current.chapter + "_"])  // custom time pieces
+            ||
+            vars.splitInLoadScreen && vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0  // delayed custom time pieces
+            )
+        )
+        )
+        {
             return true;
         }
 
+    // pause screen splits
+    else if (vars.realActTime.Current == 0f && settings["manySplits_" + current.chapter + "_" + current.act + "_entry"]){
+        vars.splitsLock = true;
+        return true;
+    }
+    
     return false;
 }
 
