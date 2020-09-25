@@ -1,5 +1,5 @@
-// TODO: wtmt entry, fix alpine multisplits (pos) add all rift splits
-// done: custom tp, delayed tp, act entry (wxcept wtmt), cp, cp_pause, cp_pause_pos, decide what to do with pos splits (alpine and slap),
+// TODO: add all rift splits
+// done: custom tp, delayed tp, act entry, cp, cp_pause, cp_pause_pos, all pos splits,
 // bonus: initial load is much faster now
 
 state("HatinTimeGame", "DLC 2.1") {
@@ -98,7 +98,7 @@ startup {
 
     for (int j = 1; j <= 7; j++){
         for (int i = 1; i <= 7; i++){
-            if ((j <= 4) && string.Compare(actNames[j-1, i-1], "") != 0){
+            if (j <= 4 && string.Compare(actNames[j-1, i-1], "") != 0){
                 settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i, true, actNames[j-1, i-1], "manySplits_" + (j == 4 ? 6 : j));
                 settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i + "_entry", false, "Entry", "manySplits_" + (j == 4 ? 6 : j) + "_" + i);
             }
@@ -163,7 +163,7 @@ startup {
 
     for (int j = 1; j <= 7; j++){
         for (int i = 1; i <= 7; i++){
-            if ((j <= 4) && string.Compare(actNames[j-1, i-1], "") != 0){
+            if (j <= 4 && string.Compare(actNames[j-1, i-1], "") != 0){
                 settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i + "_tp", true, "Time Piece", "manySplits_" + (j == 4 ? 6 : j) + "_" + i);
                 settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i + "_tpDelayed", false, "Delayed Time Piece", "manySplits_" + (j == 4 ? 6 : j) + "_" + i);
                 settings.SetToolTip("manySplits_" + (j == 4 ? 6 : j) + "_" + i + "_tpDelayed", "This triggers on the loading screen after getting the time piece.");
@@ -179,7 +179,8 @@ startup {
 
     vars.lastChapter = 0; // used by seal the deal split
     vars.splitInLoadScreen = false;
-    vars.splitsLock = false; // locks splits, prevents multiple splits on loading screens
+    vars.splitsLockTimer = new Stopwatch();
+    vars.splitsLockTimer.Start();
     }
 
 init {
@@ -262,15 +263,15 @@ init {
 			                 act != 3  && settings["4_lava_cake"] && x > 3000f  && x < 30400f && y > -28500f && y < -27353f&& z > 3200f  && z < 4000f  ||   // lava cake arrival
 			                 act != 13 && settings["4_windmill"] && x > 71600f && x < 72300f && y > 21500f  && y < 22700f && z > 1500f  && z < 2100f   ||   // windmill arrival
 			                 act != 15 && settings["4_twilight"] && x > 4600f  && x < 8700f  && y > 69000f  && y < 70000f && z > 4000f  && z < 5400f   ||   // twilight bell arrival
-			                 settings["4_illness_bh"]   && x > -20000f&& x < -10000f&& y > 45000f  && y < 52500f && z < -9680f                         ||   // illness birdhouse warp
-			                 settings["4_illness_wind"] && x > 38000f && x < 47000f && y > 28000f  && y < 34000f && z < -9680f)                        ||   // illness windmill warp
+			                 settings["4_illness_bh"]   && x > -20000f && x < -10000f && y > 45000f  && y < 52500f && z < -9680f                       ||   // illness birdhouse warp
+			                 settings["4_illness_wind"] && x > 38000f  && x < 47000f  && y > 28000f  && y < 34000f && z < -9680f)                      ||   // illness windmill warp
             chapter == 5 && settings["manySplits_5_slap"] && x > -38300f && x <-38190f && y > -85000f && y <-84000f && z >-59900f && z <-59000f        ||   // slap (5-1)
 			
 			timerChangedState  &&  (chapter == 1 && settings["manySplits_1_4_cp0_pause_pos"] && x > 3500f  && x < 4500f  && y > -3500f  && y < -3000f && z > 8000f  && z < 9000f    ||   // mafia boss enter HQ (1-4)
                                     chapter == 2 && settings["manySplits_2_6_cp0_pause_pos"] && x > 5500f  && x < 9500f  && y > 8200f   && y < 12000f && z < 5000f                  ||   // basement boss entry (2-6)
 			                        chapter == 3 && settings["manySplits_3_2_cp0_pause_pos"] && x > 15800f && x < 17000f && y > 10900f  && y < 11900f && z < 2000f                  ||   // inside well (3-2)
 			                        chapter == 3 && settings["manySplits_3_4_cp0_pause_pos"] && x > -28000f&& x < -26000f&& y > 2000f   && y < 3400f  && z > 200f   && z < 1200f    ||   // qvm inside manor (3-4)
-			                        chapter == 4 && settings["manySplits_4_99_cp0_pause_pos"]&& x > 37000f && x < 41000f && y > 47000f  && y < 51000f && z > -14000f&& z < -5000f ));    // alpine intro(4-99)
+			                        chapter == 4 && settings["manySplits_4_99_cp0_pause_pos"]&& x > 37000f && x < 41000f && y > 47000f  && y < 51000f && z > -14000f&& z < -5000f ));    // alpine intro (4-99)
 	};
 	vars.ShouldSplitAtThisPos = ShouldSplitAtThisPos;
 }
@@ -285,7 +286,6 @@ update {
     }
     if (vars.gameTimerIsPaused.Current == 0 && vars.gameTimerIsPaused.Old == 1){
         vars.splitInLoadScreen = false;
-        vars.splitsLock = false;
     }
 }
 
@@ -296,7 +296,7 @@ start {
 }
 
 split {
-    if (vars.timerState.Current != 0 && !vars.splitsLock
+    if (vars.timerState.Current != 0
         &&
         (
         settings["splits"] 
@@ -318,17 +318,20 @@ split {
             ||
             current.checkpoint != old.checkpoint && settings["manySplits_" + current.chapter + "_" + current.act + "_cp" + current.checkpoint] // new checkpoint
             ||
-            vars.ShouldSplitAtThisPos(current.chapter, current.act, vars.gameTimerIsPaused.Changed, current.x, current.y, current.z) // all position splits
-            ||
             vars.splitInLoadScreen && vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0  // delayed custom time pieces
             ||
-            vars.realActTime.Current == 0f && vars.realActTime.Old != 0f && (settings["manySplits_" + current.chapter + "_" + current.act + "_entry"] || settings["manySplits_" + current.chapter + "_entry"]) // act entry
+            vars.realActTime.Old == 0f && vars.actTimerIsPaused.Current == 0 && vars.actTimerIsPaused.Old == 1 && (settings["manySplits_" + current.chapter + "_" + current.act + "_entry"] || settings["manySplits_" + current.chapter + "_entry"]) // act entry
             ||
             vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0 && settings["manySplits_" + current.chapter + "_" + current.act + "_cp" + current.checkpoint + "_pause"] // paused with certain checkpoint
             )
         )
         )
         {
+            return true;
+        }
+        // all position splits
+        else if (version != "Undetected" && vars.ShouldSplitAtThisPos(current.chapter, current.act, vars.gameTimerIsPaused.Changed, current.x, current.y, current.z) && vars.splitsLockTimer.ElapsedMilliseconds > 10000){
+            vars.splitsLockTimer.Restart();
             return true;
         }
 
