@@ -63,10 +63,12 @@ startup {
 
     settings.Add("settings", true, "Settings");
     settings.CurrentDefaultParent = "settings";
-    settings.Add("IL_mode", false, "IL Mode - Follow the act timer instead of the game timer");
-    settings.SetToolTip("IL_mode", "This will also start the timer when the act timer is at 0, and reset when using \"restartil\" or exiting a level.");
-    settings.Add("settings_new_file_start", true, "Only start the timer when opening an empty file");
-    settings.Add("game_time_message", true, "Ask if Game Time should be used when the game opens");
+    settings.Add("settings_ILMode", false, "IL Mode - Follow the act timer instead of the game timer");
+    settings.SetToolTip("settings_ILMode", "This will also start the timer when the act timer is at 0, and reset when using \"restartil\" or exiting a level.");
+    settings.Add("settings_newFileStart", true, "Only start the timer when opening an empty file");
+    settings.Add("settings_gameTimeMsg", true, "Ask if Game Time should be used when the game opens");
+    settings.Add("settings_noResetIntro", false, "Avoid resetting when going back to main menu after starting a new file");
+    settings.SetToolTip("settings_noResetIntro", "Timer won't reset at hat kid's room when she has 0 timpepieces.\nSupported patches only.");
 
     settings.CurrentDefaultParent = null;
     settings.Add("splits", true, "Splits");
@@ -77,12 +79,14 @@ startup {
     settings.SetToolTip("splits_tp_any", "This adds repeated time pieces and death wish time pieces but may not trigger under certain conditions.\nRecommended to use with \"New Time Pieces\".");
     settings.Add("splits_tp_std", true, "Seal The Deal", "splits_tp");
     settings.SetToolTip("splits_tp_std", "End of Death Wish Any%.\nOnly works on detected patches.");
+    settings.Add("splits_actEntry", false, "Act Entries");
+    settings.SetToolTip("splits_actEntry", "Also for time rifts in the spaceship.");
     settings.Add("splits_dwbth", false, "Death Wish Level Back to Hub");
     settings.SetToolTip("splits_dwbth", "Only works on detected patches.");
     settings.CurrentDefaultParent = null;
 
     settings.Add("manySplits", false, "Detailed Splits");
-    settings.SetToolTip("manySplits", "If you want more customizable options, use these splits instead.\nThey only work on detected patches.");
+    settings.SetToolTip("manySplits", "Here you can find a lot of customizable options.\nThey only work on detected patches.");
 
     string[] chapterNames = new string[7] {"Mafia Town", "Battle of the Birds", "Subcon Forest", "Alpine Skyline", "Time's End - The Finale", "The Artic Cruise", "Nyakuza Metro"};
 
@@ -181,11 +185,35 @@ startup {
     vars.splitInLoadScreen = false;
     vars.splitsLockTimer = new Stopwatch();
     vars.splitsLockTimer.Start();
+
+    // updates a text component in the layout, also creates it if it doesn't exist
+	Action <string, string> UpdateTextComponent = (string name, string updatedText) => {
+		bool foundComponent = false;
+		foreach (dynamic component in timer.Layout.Components){
+			if (component.GetType().Name != "TextComponent" || component.Settings.Text1 != name) continue;
+			component.Settings.Text2 = updatedText;
+			foundComponent = true;
+			break;
+		}
+		if (!foundComponent) vars.CreateTextComponent(name, updatedText);
+	};
+	vars.UpdateTextComponent = UpdateTextComponent;
+	
+	// creates a text component, used when UpdateTextComponent doens't find the text component requested
+	Action <string, string> CreateTextComponent = (string textLeft, string textRight) => {
+		var textComponentAssembly = Assembly.LoadFrom("Components\\LiveSplit.Text.dll");
+		dynamic textComponent = Activator.CreateInstance(textComponentAssembly.GetType("LiveSplit.UI.Components.TextComponent"), timer);
+		timer.Layout.LayoutComponents.Add(new LiveSplit.UI.Components.LayoutComponent("LiveSplit.Text.dll", textComponent as LiveSplit.UI.Components.IComponent));
+		textComponent.Settings.Text1 = textLeft;
+		textComponent.Settings.Text2 = textRight;
+	};
+	vars.CreateTextComponent = CreateTextComponent;
+
     }
 
 init {
 
-    if (timer.CurrentTimingMethod == TimingMethod.RealTime && settings["game_time_message"]){
+    if (timer.CurrentTimingMethod == TimingMethod.RealTime && settings["settings_gameTimeMsg"]){
         var message = MessageBox.Show(
             "Would you like to change the current timing method to\nGame Time instead of Real Time?", 
             "LiveSplit | A Hat in Time Auto Splitter", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
@@ -258,22 +286,22 @@ init {
     };
 
     // for certain conditions that need hat kid's position to work
-	Func <int, int, bool, float, float, float, bool> ShouldSplitAtThisPos = (int chapter, int act, bool timerChangedState, float x, float y, float z) => {
-	return (chapter == 4 && (act != 4  && settings["4_birdhouse"] && x > -24000f&& x < -23000f&& y > 29000f  && y < 30500f && z > 4000f  && z < 6000f  ||   // birdhouse arrival
-			                 act != 3  && settings["4_lava_cake"] && x > 3000f  && x < 30400f && y > -28500f && y < -27353f&& z > 3200f  && z < 4000f  ||   // lava cake arrival
-			                 act != 13 && settings["4_windmill"] && x > 71600f && x < 72300f && y > 21500f  && y < 22700f && z > 1500f  && z < 2100f   ||   // windmill arrival
-			                 act != 15 && settings["4_twilight"] && x > 4600f  && x < 8700f  && y > 69000f  && y < 70000f && z > 4000f  && z < 5400f   ||   // twilight bell arrival
-			                 settings["4_illness_bh"]   && x > -20000f && x < -10000f && y > 45000f  && y < 52500f && z < -9680f                       ||   // illness birdhouse warp
-			                 settings["4_illness_wind"] && x > 38000f  && x < 47000f  && y > 28000f  && y < 34000f && z < -9680f)                      ||   // illness windmill warp
+    Func <int, int, bool, float, float, float, bool> ShouldSplitAtThisPos = (int chapter, int act, bool timerChangedState, float x, float y, float z) => {
+    return(chapter == 4 && (act != 4  && settings["4_birdhouse"] && x > -24000f&& x < -23000f&& y > 29000f  && y < 30500f && z > 4000f  && z < 6000f  ||   // birdhouse arrival
+                            act != 3  && settings["4_lava_cake"] && x > 3000f  && x < 30400f && y > -28500f && y < -27353f&& z > 3200f  && z < 4000f  ||   // lava cake arrival
+                            act != 13 && settings["4_windmill"] && x > 71600f && x < 72300f && y > 21500f  && y < 22700f && z > 1500f  && z < 2100f   ||   // windmill arrival
+                            act != 15 && settings["4_twilight"] && x > 4600f  && x < 8700f  && y > 69000f  && y < 70000f && z > 4000f  && z < 5400f   ||   // twilight bell arrival
+                            settings["4_illness_bh"]   && x > -20000f && x < -10000f && y > 45000f  && y < 52500f && z < -9680f                       ||   // illness birdhouse warp
+                            settings["4_illness_wind"] && x > 38000f  && x < 47000f  && y > 28000f  && y < 34000f && z < -9680f)                      ||   // illness windmill warp
             chapter == 5 && settings["manySplits_5_slap"] && x > -38300f && x <-38190f && y > -85000f && y <-84000f && z >-59900f && z <-59000f        ||   // slap (5-1)
-			
-			timerChangedState  &&  (chapter == 1 && settings["manySplits_1_4_cp0_pause_pos"] && x > 3500f  && x < 4500f  && y > -3500f  && y < -3000f && z > 8000f  && z < 9000f    ||   // mafia boss enter HQ (1-4)
+            
+            timerChangedState  &&  (chapter == 1 && settings["manySplits_1_4_cp0_pause_pos"] && x > 3500f  && x < 4500f  && y > -3500f  && y < -3000f && z > 8000f  && z < 9000f    ||   // mafia boss enter HQ (1-4)
                                     chapter == 2 && settings["manySplits_2_6_cp0_pause_pos"] && x > 5500f  && x < 9500f  && y > 8200f   && y < 12000f && z < 5000f                  ||   // basement boss entry (2-6)
-			                        chapter == 3 && settings["manySplits_3_2_cp0_pause_pos"] && x > 15800f && x < 17000f && y > 10900f  && y < 11900f && z < 2000f                  ||   // inside well (3-2)
-			                        chapter == 3 && settings["manySplits_3_4_cp0_pause_pos"] && x > -28000f&& x < -26000f&& y > 2000f   && y < 3400f  && z > 200f   && z < 1200f    ||   // qvm inside manor (3-4)
-			                        chapter == 4 && settings["manySplits_4_99_cp0_pause_pos"]&& x > 37000f && x < 41000f && y > 47000f  && y < 51000f && z > -14000f&& z < -5000f ));    // alpine intro (4-99)
-	};
-	vars.ShouldSplitAtThisPos = ShouldSplitAtThisPos;
+                                    chapter == 3 && settings["manySplits_3_2_cp0_pause_pos"] && x > 15800f && x < 17000f && y > 10900f  && y < 11900f && z < 2000f                  ||   // inside well (3-2)
+                                    chapter == 3 && settings["manySplits_3_4_cp0_pause_pos"] && x > -28000f&& x < -26000f&& y > 2000f   && y < 3400f  && z > 200f   && z < 1200f    ||   // qvm inside manor (3-4)
+                                    chapter == 4 && settings["manySplits_4_99_cp0_pause_pos"]&& x > 37000f && x < 41000f && y > 47000f  && y < 51000f && z > -14000f&& z < -5000f ));    // alpine intro (4-99)
+    };
+    vars.ShouldSplitAtThisPos = ShouldSplitAtThisPos;
 }
 
 update {
@@ -287,12 +315,16 @@ update {
     if (vars.gameTimerIsPaused.Current == 0 && vars.gameTimerIsPaused.Old == 1){
         vars.splitInLoadScreen = false;
     }
+
+    vars.UpdateTextComponent("X", current.x.ToString());
+    vars.UpdateTextComponent("Y", current.y.ToString());
+    vars.UpdateTextComponent("Z", current.z.ToString());
 }
 
 start {
-    return (settings["settings_new_file_start"] && vars.timerState.Current == 1 && vars.timerState.Old == 0 && vars.timePieceCount.Current == 0)
-        || (!settings["settings_new_file_start"] && vars.timerState.Current == 1 && vars.timerState.Old == 0)
-        || (settings["IL_mode"] && vars.actTimerIsVisible.Current == 1 && vars.realActTime.Current == 0);
+    return (settings["settings_newFileStart"] && vars.timerState.Current == 1 && vars.timerState.Old == 0 && vars.timePieceCount.Current == 0)
+        || (!settings["settings_newFileStart"] && vars.timerState.Current == 1 && vars.timerState.Old == 0)
+        || (settings["settings_ILMode"] && vars.actTimerIsVisible.Current == 1 && vars.realActTime.Current == 0);
 }
 
 split {
@@ -308,6 +340,8 @@ split {
             ||
             vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && version != "Undetected" && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"]  // seal the deal
             ||
+            vars.realActTime.Old == 0f && vars.actTimerIsPaused.Current == 0 && vars.actTimerIsPaused.Old == 1 // act entry
+            ||
             version != "Undetected" && current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"]  // death wish back to hub
             )
         ||
@@ -320,7 +354,7 @@ split {
             ||
             vars.splitInLoadScreen && vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0  // delayed custom time pieces
             ||
-            vars.realActTime.Old == 0f && vars.actTimerIsPaused.Current == 0 && vars.actTimerIsPaused.Old == 1 && (settings["manySplits_" + current.chapter + "_" + current.act + "_entry"] || settings["manySplits_" + current.chapter + "_entry"]) // act entry
+            vars.realActTime.Old == 0f && vars.actTimerIsPaused.Current == 0 && vars.actTimerIsPaused.Old == 1 && (settings["manySplits_" + current.chapter + "_" + current.act + "_entry"] || settings["manySplits_" + current.chapter + "_entry"]) // custom act entry
             ||
             vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0 && settings["manySplits_" + current.chapter + "_" + current.act + "_cp" + current.checkpoint + "_pause"] // paused with certain checkpoint
             )
@@ -339,7 +373,11 @@ split {
 }
 
 reset {
-    return vars.timerState.Current == 0 && vars.timerState.Old == 1 || settings["IL_mode"] && (vars.actTimerIsVisible.Current == 0 && vars.actTimerIsVisible.Old == 1 || vars.realActTime.Current < vars.realActTime.Old);
+    if (vars.timePieceCount.Old == 0 && settings["settings_noResetIntro"] && version != "Undetected" && current.x > -2300f && current.x < -2000f && current.y > -2000f && current.y < -1750f){
+        return false;
+    }
+    return vars.timerState.Current == 0 && vars.timerState.Old == 1 
+        || settings["settings_ILMode"] && (vars.actTimerIsVisible.Current == 0 && vars.actTimerIsVisible.Old == 1 || vars.realActTime.Current < vars.realActTime.Old);
 }
 
 isLoading {
@@ -347,5 +385,5 @@ isLoading {
 }
 
 gameTime {
-    return settings["IL_mode"] ? TimeSpan.FromSeconds(vars.realActTime.Current) : TimeSpan.FromSeconds(vars.realGameTime.Current);
+    return settings["settings_ILMode"] ? TimeSpan.FromSeconds(vars.realActTime.Current) : TimeSpan.FromSeconds(vars.realGameTime.Current);
 }
