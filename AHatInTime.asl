@@ -1,23 +1,45 @@
-// TODO: cp, cp_pause, cp_pause_pos, decide what to do with pos splits (alpine and slap), test act entries, add all rift splits
+// TODO: wtmt entry, fix alpine multisplits (pos) add all rift splits
+// done: custom tp, delayed tp, act entry (wxcept wtmt), cp, cp_pause, cp_pause_pos, decide what to do with pos splits (alpine and slap),
+// bonus: initial load is much faster now
 
 state("HatinTimeGame", "DLC 2.1") {
+    float x : 0x011BC360, 0x6DC, 0x00, 0x68, 0x51C, 0x80;
+    float y : 0x011BC360, 0x6DC, 0x00, 0x68, 0x51C, 0x84;
+    float z : 0x011BC360, 0x6DC, 0x00, 0x68, 0x51C, 0x88;
+
     int chapter : 0x011E1570, 0x68, 0x108;
     int act : 0x011E1570, 0x68, 0x10C;
+    int checkpoint : 0x011E1570, 0x68, 0x110;
 }
 
 state("HatinTimeGame", "110% Patch") {
+    float x : 0x011F9FE0, 0x6DC, 0x00, 0x68, 0x51C, 0x80;
+    float y : 0x011F9FE0, 0x6DC, 0x00, 0x68, 0x51C, 0x84;
+    float z : 0x011F9FE0, 0x6DC, 0x00, 0x68, 0x51C, 0x88;
+
     int chapter : 0x0121F280, 0x68, 0x108;
     int act : 0x0121F280, 0x68, 0x10C;
+    int checkpoint : 0x0121F280, 0x68, 0x110;
 }
 
 state("HatinTimeGame", "DLC 1.5") {
+    float x : 0x011C27E0, 0x6DC, 0x00, 0x68, 0x2F4, 0x80;
+    float y : 0x011C27E0, 0x6DC, 0x00, 0x68, 0x2F4, 0x84;
+    float z : 0x011C27E0, 0x6DC, 0x00, 0x68, 0x2F4, 0x88;
+
     int chapter: 0x011E7550, 0x68, 0x108;
     int act : 0x011E7550, 0x68, 0x10C;
+    int checkpoint : 0x011E7550, 0x68, 0x110;
 }
 
 state("HatinTimeGame", "Modding") {
+    float x : 0x011229C0, 0x6DC, 0x00, 0x68, 0x508, 0x80;
+    float y : 0x011229C0, 0x6DC, 0x00, 0x68, 0x508, 0x84;
+    float z : 0x011229C0, 0x6DC, 0x00, 0x68, 0x508, 0x88;
+
     int chapter : 0x011475A8, 0x64, 0xF8;
     int act : 0x011475A8, 0x64, 0xFC;
+    int checkpoint : 0x011475A8, 0x64, 0x100;
 }
 
 startup {
@@ -78,21 +100,21 @@ startup {
         for (int i = 1; i <= 7; i++){
             if ((j <= 4) && string.Compare(actNames[j-1, i-1], "") != 0){
                 settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i, true, actNames[j-1, i-1], "manySplits_" + (j == 4 ? 6 : j));
-                settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i + "_entry", false, "Telescope Entry", "manySplits_" + (j == 4 ? 6 : j) + "_" + i);
+                settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i + "_entry", false, "Entry", "manySplits_" + (j == 4 ? 6 : j) + "_" + i);
             }
             else {
                 i = 8;
             }
         }
         if (j == 4 || j == 5 || j == 7){
-            settings.Add("manySplits_" + j + "_entry", false, "Telescope Entry", "manySplits_" + j);
+            settings.Add("manySplits_" + j + "_entry", false, "Entry", "manySplits_" + j);
         }
     }
 
     settings.Add("manySplits_1_1_cp1", false, "Umbrella Fight", "manySplits_1_1");
     settings.Add("manySplits_1_2_cp1", false, "Battle Start", "manySplits_1_2");
     settings.Add("manySplits_1_3_cp1", false, "Scare", "manySplits_1_3");
-    settings.Add("1_4_cp0_pause_pos", false, "Enter HQ", "manySplits_1_4");
+    settings.Add("manySplits_1_4_cp0_pause_pos", false, "Enter HQ", "manySplits_1_4");
     settings.Add("manySplits_1_4_cp1", false, "Vent", "manySplits_1_4");
     settings.Add("manySplits_1_4_cp2", false, "Boss", "manySplits_1_4");
     settings.Add("manySplits_1_6_cp59_pause", false, "Death", "manySplits_1_6");
@@ -112,9 +134,23 @@ startup {
     settings.Add("manySplits_3_4_cp0_pause_pos", false, "Inside Manor", "manySplits_3_4");
     settings.Add("manySplits_3_6_cp1", false, "Fight Start", "manySplits_3_6");
 
-    settings.Add("manySplits_4_99_cp0_pause_pos", false, "Intro End", "manySplits_4");
+    settings.CurrentDefaultParent = "manySplits_4";
+    settings.Add("manySplits_4_99_cp0_pause_pos", false, "Intro End");
     settings.SetToolTip("manySplits_4_99_cp0_pause_pos", "Triggered when going back to hub right after the screen fades to white in the zipline.");
+    settings.Add("4_birdhouse", false, "The Birdhouse Arrival");
+    settings.SetToolTip("4_birdhouse", "Triggered close to the end of the zipline.");
+    settings.Add("4_lava_cake", false, "The Lava Cake Arrival");
+    settings.SetToolTip("4_lava_cake", "Triggered close to the end of the zipline.");
+    settings.Add("4_windmill", false, "The Windmill Arrival");
+    settings.SetToolTip("4_windmill", "Triggered close to the end of the zipline.");
+    settings.Add("4_twilight", false, "The Twilight Bell Arrival");
+    settings.SetToolTip("4_twilight", "Triggered close to the end of the zipline.");
+    settings.Add("4_illness_bh", false, "The Illness Has Spread - Birdhouse Warp");
+    settings.Add("4_illness_wind", false, "The Illness Has Spread - Windmill Warp");
 
+    settings.CurrentDefaultParent = null;
+
+    settings.Add("manySplits_5_slap", false, "Slap", "manySplits_5");
     settings.Add("manySplits_5_1_cp10", false, "Hyper Zone", "manySplits_5");
 
     settings.Add("manySplits_6_1_cp3", false, "Check-in", "manySplits_6_1");
@@ -168,7 +204,7 @@ init {
 
     var ptr = IntPtr.Zero;
 
-    foreach (var page in game.MemoryPages(true)) {
+    foreach (var page in game.MemoryPages(true).Reverse()) {
         // if (page.State == MemPageState.MEM_COMMIT &&
         //     page.Type == MemPageType.MEM_IMAGE &&
         //     page.Protect == MemPageProtect.PAGE_READWRITE
@@ -219,6 +255,24 @@ init {
         vars.realActTime,
         vars.timePieceCount
     };
+
+    // for certain conditions that need hat kid's position to work
+	Func <int, int, bool, float, float, float, bool> ShouldSplitAtThisPos = (int chapter, int act, bool timerChangedState, float x, float y, float z) => {
+	return (chapter == 4 && (act != 4  && settings["4_birdhouse"] && x > -24000f&& x < -23000f&& y > 29000f  && y < 30500f && z > 4000f  && z < 6000f  ||   // birdhouse arrival
+			                 act != 3  && settings["4_lava_cake"] && x > 3000f  && x < 30400f && y > -28500f && y < -27353f&& z > 3200f  && z < 4000f  ||   // lava cake arrival
+			                 act != 13 && settings["4_windmill"] && x > 71600f && x < 72300f && y > 21500f  && y < 22700f && z > 1500f  && z < 2100f   ||   // windmill arrival
+			                 act != 15 && settings["4_twilight"] && x > 4600f  && x < 8700f  && y > 69000f  && y < 70000f && z > 4000f  && z < 5400f   ||   // twilight bell arrival
+			                 settings["4_illness_bh"]   && x > -20000f&& x < -10000f&& y > 45000f  && y < 52500f && z < -9680f                         ||   // illness birdhouse warp
+			                 settings["4_illness_wind"] && x > 38000f && x < 47000f && y > 28000f  && y < 34000f && z < -9680f)                        ||   // illness windmill warp
+            chapter == 5 && settings["manySplits_5_slap"] && x > -38300f && x <-38190f && y > -85000f && y <-84000f && z >-59900f && z <-59000f        ||   // slap (5-1)
+			
+			timerChangedState  &&  (chapter == 1 && settings["manySplits_1_4_cp0_pause_pos"] && x > 3500f  && x < 4500f  && y > -3500f  && y < -3000f && z > 8000f  && z < 9000f    ||   // mafia boss enter HQ (1-4)
+                                    chapter == 2 && settings["manySplits_2_6_cp0_pause_pos"] && x > 5500f  && x < 9500f  && y > 8200f   && y < 12000f && z < 5000f                  ||   // basement boss entry (2-6)
+			                        chapter == 3 && settings["manySplits_3_2_cp0_pause_pos"] && x > 15800f && x < 17000f && y > 10900f  && y < 11900f && z < 2000f                  ||   // inside well (3-2)
+			                        chapter == 3 && settings["manySplits_3_4_cp0_pause_pos"] && x > -28000f&& x < -26000f&& y > 2000f   && y < 3400f  && z > 200f   && z < 1200f    ||   // qvm inside manor (3-4)
+			                        chapter == 4 && settings["manySplits_4_99_cp0_pause_pos"]&& x > 37000f && x < 41000f && y > 47000f  && y < 51000f && z > -14000f&& z < -5000f ));    // alpine intro(4-99)
+	};
+	vars.ShouldSplitAtThisPos = ShouldSplitAtThisPos;
 }
 
 update {
@@ -262,7 +316,15 @@ split {
             (
             (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && (settings["manySplits_" + current.chapter + "_" + current.act + "_tp"] || settings["manySplits_" + current.chapter + "_"])  // custom time pieces
             ||
+            current.checkpoint != old.checkpoint && settings["manySplits_" + current.chapter + "_" + current.act + "_cp" + current.checkpoint] // new checkpoint
+            ||
+            vars.ShouldSplitAtThisPos(current.chapter, current.act, vars.gameTimerIsPaused.Changed, current.x, current.y, current.z) // all position splits
+            ||
             vars.splitInLoadScreen && vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0  // delayed custom time pieces
+            ||
+            vars.realActTime.Current == 0f && vars.realActTime.Old != 0f && (settings["manySplits_" + current.chapter + "_" + current.act + "_entry"] || settings["manySplits_" + current.chapter + "_entry"]) // act entry
+            ||
+            vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0 && settings["manySplits_" + current.chapter + "_" + current.act + "_cp" + current.checkpoint + "_pause"] // paused with certain checkpoint
             )
         )
         )
@@ -270,12 +332,6 @@ split {
             return true;
         }
 
-    // pause screen splits
-    else if (vars.realActTime.Current == 0f && settings["manySplits_" + current.chapter + "_" + current.act + "_entry"]){
-        vars.splitsLock = true;
-        return true;
-    }
-    
     return false;
 }
 
