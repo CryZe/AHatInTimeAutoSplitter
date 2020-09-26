@@ -1,3 +1,11 @@
+// TODO: 
+// investigate award ceremony entry split
+// change illness windmill pos to work with tree slide
+// change alpine telescope entry 
+// consider adding list of triggered pos splits
+// consider adding 2 level pos splits? (first pos 1 is touched, then pos 2 triggers a split)
+// do a better text component update for rifts
+
 state("HatinTimeGame", "DLC 2.1") {
     float x : 0x011BC360, 0x6DC, 0x00, 0x68, 0x51C, 0x80;
     float y : 0x011BC360, 0x6DC, 0x00, 0x68, 0x51C, 0x84;
@@ -343,19 +351,51 @@ init {
 
     // checks if hat kid was moved to the hub
     Func <int, float, float, float, bool> BackToHubCheck = (int chapter, float x, float y, float z) => {
-    return (                 x > -680f   && x < -670f   && y > 1535f  && y < 1545f  && z > 235f  && z < 250f   ||
-            chapter == 1  && x > 295f    && x < 325f    && y > 95f    && y < 125f                              ||
-            chapter == 2  && x > 2445f   && x < 2455f   && y > 210f   && y < 220f   && z > 80f   && z < 130f   ||
-            chapter == 2  && x > 2400f   && x < 2450f   && y > -60f   && y < -40f   && z > 40f   && z < 100f   ||  // older patches
-            chapter == 3  && x > -2020f  && x < -2010f  && y > -1910f && y < -1900f && z > 30f   && z < 100f   ||
-            chapter == 4  && x > -590f   && x < -580f   && y > -3965f && y < -3955f && z > -315f && z < -250f  ||
-            chapter == 5  && x > -1265f  && x < -1255f  && y > -25f   && y < -15f   && z > 290f  && z < 340f   ||
-            chapter == 6  && x > 20365f  && x < 20375f  && y > -23840f&& y < -23830f&& z > 1280f && z < 1330f  ||
-            chapter == 7  && x > 26260f  && x < 26270f  && y > -23015f&& y < -23005 && z > 1290f && z < 1400f  ||
-            chapter == 97 && x > -2310f  && x < -2300f  && y > -2085f && y < -2075f && z > 35f   && z < 100f   ||  // death wish
-            chapter == 99 && x > 1600f   && x < 1610f   && y > 1625f  && y < 1635f  && z > 405f  && z < 455f   );  // mod levels
+    return (                 x > -690f   && x < -660f   && y > 1525f  && y < 1555f  && z > 225f  && z < 260f   ||
+            chapter == 1  && x > 195f    && x < 425f    && y > 0f     && y < 200f                              ||
+            chapter == 2  && x > 2345f   && x < 2555f   && y > 110f   && y < 320f   && z > 0f    && z < 200f   ||
+            chapter == 2  && x > 2300f   && x < 2550f   && y > -160f  && y < 60f    && z > 0f    && z < 200f   ||  // older patches
+            chapter == 3  && x > -2120f  && x < -1910f  && y > -2010f && y < -1800f && z > 0f    && z < 150f   ||
+            chapter == 4  && x > -690f   && x < -480f   && y > -4065f && y < -3855f && z > -325f && z < -240f  ||
+            chapter == 5  && x > -1365f  && x < -1155f  && y > -125f  && y <  85f   && z > 280f  && z < 350f   ||
+            chapter == 6  && x > 19365f  && x < 21375f  && y > -24840f&& y < -22830f&& z > 1200f && z < 1400f  ||
+            chapter == 7  && x > 25260f  && x < 27270f  && y > -24015f&& y < -22005 && z > 1190f && z < 1500f  ||
+            chapter == 97 && x > -2410f  && x < -2200f  && y > -2185f && y < -1975f && z > -65f  && z < 200f   ||  // death wish
+            chapter == 99 && x > 1500f   && x < 1710f   && y > 1525f  && y < 1735f  && z > 400f  && z < 500f   );  // mod levels
     };
     vars.BackToHubCheck = BackToHubCheck;
+
+
+
+
+
+
+    // borrarrrrrrrrrrrrrrr
+
+    // updates a text component in the layout, also creates it if it doesn't exist
+	Action <string, string> UpdateTextComponent = (string name, string updatedText) => {
+		bool foundComponent = false;
+		foreach (dynamic component in timer.Layout.Components){
+			if (component.GetType().Name != "TextComponent" || component.Settings.Text1 != name) continue;
+			component.Settings.Text2 = updatedText;
+			foundComponent = true;
+			break;
+		}
+		if (!foundComponent) vars.CreateTextComponent(name, updatedText);
+	};
+	vars.UpdateTextComponent = UpdateTextComponent;
+	
+	// creates a text component, used when UpdateTextComponent doens't find the text component requested
+	Action <string, string> CreateTextComponent = (string textLeft, string textRight) => {
+		var textComponentAssembly = Assembly.LoadFrom("Components\\LiveSplit.Text.dll");
+		dynamic textComponent = Activator.CreateInstance(textComponentAssembly.GetType("LiveSplit.UI.Components.TextComponent"), timer);
+		timer.Layout.LayoutComponents.Add(new LiveSplit.UI.Components.LayoutComponent("LiveSplit.Text.dll", textComponent as LiveSplit.UI.Components.IComponent));
+		textComponent.Settings.Text1 = textLeft;
+		textComponent.Settings.Text2 = textRight;
+	};
+	vars.CreateTextComponent = CreateTextComponent;
+
+
 }
 
 update {
@@ -389,7 +429,9 @@ split {
     // rift entry detection + split
     if (vars.gameTimerIsPaused.Changed && version != "Undetected" && vars.currentRift == "none" && settings["manySplits"]){
         vars.currentRift = vars.CurrentRiftCheck(current.chapter, current.x, current.y, current.z);
-        return settings[vars.currentRift + "_entry"];
+        if (!settings["settings_ILMode"] && vars.currentRift != "none"){
+            return settings[vars.currentRift + "_entry"];
+        }
     }
 
     if (settings["splits"] 
@@ -401,7 +443,7 @@ split {
             ||
             vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && version != "Undetected" && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"]  // seal the deal
             ||
-            vars.realActTime.Old == 0f && vars.actTimerIsPaused.Current == 0 && vars.actTimerIsPaused.Old == 1 && settings["splits_actEntry"] && vars.currentRift == "none" && !settings["settings_ILMode"] // act entry
+            vars.realActTime.Old == 0f && vars.gameTimerIsPaused.Current == 0 && vars.gameTimerIsPaused.Old == 1 && settings["splits_actEntry"] && vars.currentRift == "none" && !settings["settings_ILMode"] // act entry
             ||
             version != "Undetected" && current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"]  // death wish back to hub
             )
@@ -409,13 +451,13 @@ split {
         settings["manySplits"] && version != "Undetected" && vars.currentRift == "none"
             &&
             (
-            (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && (settings["manySplits_" + current.chapter + "_" + current.act + "_tp"] || settings["manySplits_" + current.chapter + "_"])  // custom time pieces
+            (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && (settings["manySplits_" + current.chapter + "_" + current.act + "_tp"] || settings["manySplits_" + current.chapter + "_tp"])  // custom time pieces
             ||
             current.checkpoint != old.checkpoint && settings["manySplits_" + current.chapter + "_" + current.act + "_cp" + current.checkpoint] // new act checkpoint
             ||
             vars.splitInLoadScreen && vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0  // delayed custom time pieces
             ||
-            vars.realActTime.Old == 0f && vars.actTimerIsPaused.Current == 0 && vars.actTimerIsPaused.Old == 1 && !settings["settings_ILMode"] && (settings["manySplits_" + current.chapter + "_" + current.act + "_entry"] || settings["manySplits_" + current.chapter + "_entry"]) // custom act entry
+            vars.realActTime.Old == 0f && vars.gameTimerIsPaused.Current == 0 && vars.gameTimerIsPaused.Old == 1 && !settings["settings_ILMode"] && (settings["manySplits_" + current.chapter + "_" + current.act + "_entry"] || settings["manySplits_" + current.chapter + "_entry"]) // custom act entry
             ||
             vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0 && settings["manySplits_" + current.chapter + "_" + current.act + "_cp" + current.checkpoint + "_pause"] // paused with certain checkpoint
             )
@@ -423,7 +465,7 @@ split {
         settings["manySplits"] && vars.currentRift != "none"
             &&
             (
-            (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && (settings[vars.currentRift + "tp"]) // custom time piece (rifts)
+            (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && (settings[vars.currentRift + "_tp"]) // custom time piece (rifts)
             ||
             current.checkpoint > old.checkpoint && settings[vars.currentRift + "_cp"] // new purple rift checkpoint
             )
