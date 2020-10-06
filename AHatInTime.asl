@@ -1,10 +1,7 @@
 // TODO: 
-// investigate award ceremony entry split
 // change illness windmill pos to work with tree slide
-// change alpine telescope entry 
 // consider adding list of triggered pos splits
 // consider adding 2 level pos splits? (first pos 1 is touched, then pos 2 triggers a split)
-// do a better text component update for rifts
 
 state("HatinTimeGame", "DLC 2.1") {
     float x : 0x011BC360, 0x6DC, 0x00, 0x68, 0x51C, 0x80;
@@ -75,7 +72,7 @@ startup {
     settings.SetToolTip("settings_noResetIntro", "Timer won't reset at hat kid's room when she has 0 timpepieces.\nOnly works on detected patches.");
 
     settings.CurrentDefaultParent = null;
-    settings.Add("splits", true, "Splits");
+    settings.Add("splits", true, "Simple Splits");
     settings.CurrentDefaultParent = "splits";
     settings.Add("splits_tp", true, "Time Pieces");
     settings.Add("splits_tp_new", true, "New Time Pieces", "splits_tp");
@@ -114,7 +111,7 @@ startup {
                 i = 8;
             }
         }
-        if (j == 4 || j == 5 || j == 7){
+        if (j == 5 || j == 7){
             settings.Add("manySplits_" + j + "_entry", false, "Entry", "manySplits_" + j);
         }
     }
@@ -143,6 +140,7 @@ startup {
     settings.Add("manySplits_3_6_cp1", false, "Fight Start", "manySplits_3_6");
 
     settings.CurrentDefaultParent = "manySplits_4";
+    settings.Add("manySplits_4_99_entry", false, "Intro Entry");
     settings.Add("manySplits_4_99_cp0_pause_pos", false, "Intro End");
     settings.SetToolTip("manySplits_4_99_cp0_pause_pos", "Triggered when going back to hub right after the screen fades to white in the zipline.");
     settings.Add("4_birdhouse", false, "The Birdhouse Arrival");
@@ -221,6 +219,7 @@ startup {
     vars.splitsLockTimer = new Stopwatch();
     vars.splitsLockTimer.Start();
     vars.currentRift = "none"; // indicates the current time rift, none -> not in a rift
+    vars.justEnteredRift = false;
 }
 
 init {
@@ -400,19 +399,33 @@ init {
 
 update {
     vars.watchers.UpdateAll(game);
-    if (version != "Undetected" && current.chapter != old.chapter){
-        vars.lastChapter = old.chapter;
+    if (version != "Undetected"){
+        if (current.chapter != old.chapter){
+            vars.lastChapter = old.chapter;
+        }
+        if ((vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && settings["manySplits_" + current.chapter + "_" + current.act + "_tpDelayed"]){
+            vars.splitInLoadScreen = true;
+        }
+        if (vars.gameTimerIsPaused.Current == 0 && vars.gameTimerIsPaused.Old == 1){
+            vars.splitInLoadScreen = false;
+            vars.currentRift = (vars.BackToHubCheck(current.chapter, current.x, current.y, current.z) ? "none" : vars.currentRift);
+        }
+        if (vars.timerState.Current == 0){
+            vars.currentRift = "none";
+        }
+        
+        if (vars.justEnteredRift){
+            vars.justEnteredRift = false;
+        }
+        // rift entry detection
+        if (vars.gameTimerIsPaused.Changed && vars.currentRift == "none" && settings["manySplits"]){
+            vars.currentRift = vars.CurrentRiftCheck(current.chapter, current.x, current.y, current.z);
+            if (vars.currentRift != "none"){
+                vars.justEnteredRift = true;
+            }
+        }
     }
-    if (version != "Undetected" && (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && settings["manySplits_" + current.chapter + "_" + current.act + "_tpDelayed"]){
-        vars.splitInLoadScreen = true;
-    }
-    if (vars.gameTimerIsPaused.Current == 0 && vars.gameTimerIsPaused.Old == 1){
-        vars.splitInLoadScreen = false;
-        vars.currentRift = (vars.BackToHubCheck(current.chapter, current.x, current.y, current.z) ? "none" : vars.currentRift);
-    }
-    if (vars.timerState.Current == 0){
-        vars.currentRift = "none";
-    }
+    vars.UpdateTextComponent("Rift", vars.currentRift);
 }
 
 start {
@@ -422,19 +435,10 @@ start {
 }
 
 split {
-    if (vars.timerState.Current == 0){
-        return false;
-    }
 
-    // rift entry detection + split
-    if (vars.gameTimerIsPaused.Changed && version != "Undetected" && vars.currentRift == "none" && settings["manySplits"]){
-        vars.currentRift = vars.CurrentRiftCheck(current.chapter, current.x, current.y, current.z);
-        if (!settings["settings_ILMode"] && vars.currentRift != "none"){
-            return settings[vars.currentRift + "_entry"];
-        }
-    }
-
-    if (settings["splits"] 
+    if (vars.timerState.Current != 0
+        &&
+        settings["splits"] 
             &&
             (
             vars.timePieceCount.Current == vars.timePieceCount.Old + 1 && settings["splits_tp_new"]  // new time piece
@@ -443,7 +447,7 @@ split {
             ||
             vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && version != "Undetected" && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"]  // seal the deal
             ||
-            vars.realActTime.Old == 0f && vars.gameTimerIsPaused.Current == 0 && vars.gameTimerIsPaused.Old == 1 && settings["splits_actEntry"] && vars.currentRift == "none" && !settings["settings_ILMode"] // act entry
+            vars.gameTimerIsPaused.Old == 1 && vars.gameTimerIsPaused.Current == 0 && (vars.realActTime.Current == 0f || vars.realActTime.Old == 0f) && settings["splits_actEntry"] && vars.currentRift == "none" && !settings["settings_ILMode"] // act entry
             ||
             version != "Undetected" && current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"]  // death wish back to hub
             )
@@ -468,6 +472,8 @@ split {
             (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && (settings[vars.currentRift + "_tp"]) // custom time piece (rifts)
             ||
             current.checkpoint > old.checkpoint && settings[vars.currentRift + "_cp"] // new purple rift checkpoint
+            ||
+            vars.justEnteredRift && settings[vars.currentRift + "_entry"] && !settings["settings_ILMode"] // rift entry
             )
         )
     {
