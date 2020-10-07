@@ -1,8 +1,3 @@
-// TODO: 
-// change illness windmill pos to work with tree slide
-// consider adding list of triggered pos splits
-// consider adding 2 level pos splits? (first pos 1 is touched, then pos 2 triggers a split)
-
 state("HatinTimeGame", "DLC 2.1") {
     float x : 0x011BC360, 0x6DC, 0x00, 0x68, 0x51C, 0x80;
     float y : 0x011BC360, 0x6DC, 0x00, 0x68, 0x51C, 0x84;
@@ -143,16 +138,16 @@ startup {
     settings.Add("manySplits_4_99_entry", false, "Intro Entry");
     settings.Add("manySplits_4_99_cp0_pause_pos", false, "Intro End");
     settings.SetToolTip("manySplits_4_99_cp0_pause_pos", "Triggered when going back to hub right after the screen fades to white in the zipline.");
-    settings.Add("4_birdhouse", false, "The Birdhouse Arrival");
-    settings.SetToolTip("4_birdhouse", "Triggered close to the end of the zipline.");
-    settings.Add("4_lava_cake", false, "The Lava Cake Arrival");
-    settings.SetToolTip("4_lava_cake", "Triggered close to the end of the zipline.");
-    settings.Add("4_windmill", false, "The Windmill Arrival");
-    settings.SetToolTip("4_windmill", "Triggered close to the end of the zipline.");
-    settings.Add("4_twilight", false, "The Twilight Bell Arrival");
-    settings.SetToolTip("4_twilight", "Triggered close to the end of the zipline.");
-    settings.Add("4_illness_bh", false, "The Illness Has Spread - Birdhouse Warp");
-    settings.Add("4_illness_wind", false, "The Illness Has Spread - Windmill Warp");
+    settings.Add("manySplits_pos_40", false, "The Birdhouse Arrival");
+    settings.SetToolTip("manySplits_pos_40", "Triggered close to the end of the zipline.");
+    settings.Add("manySplits_pos_41", false, "The Lava Cake Arrival");
+    settings.SetToolTip("manySplits_pos_41", "Triggered close to the end of the zipline.");
+    settings.Add("manySplits_pos_42", false, "The Windmill Arrival");
+    settings.SetToolTip("manySplits_pos_42", "Triggered close to the end of the zipline.");
+    settings.Add("manySplits_pos_43", false, "The Twilight Bell Arrival");
+    settings.SetToolTip("manySplits_pos_43", "Triggered close to the end of the zipline.");
+    settings.Add("manySplits_pos_44", false, "The Illness Has Spread - Birdhouse Warp");
+    settings.Add("manySplits_pos_45", false, "The Illness Has Spread - Windmill Warp");
 
     settings.CurrentDefaultParent = null;
 
@@ -162,7 +157,7 @@ startup {
     settings.SetToolTip("manySplits_5_1_cp2", "Only recommended for ILs");
     settings.Add("manySplits_5_1_cp3", false, "Big Doors 2", "manySplits_5");
     settings.SetToolTip("manySplits_5_1_cp3", "Only recommended for ILs");
-    settings.Add("manySplits_5_slap", false, "Slap", "manySplits_5");
+    settings.Add("manySplits_pos_5", false, "Slap", "manySplits_5");
     settings.Add("manySplits_5_1_cp10", false, "Hyper Zone", "manySplits_5");
 
     settings.Add("manySplits_6_1_cp3", false, "Check-in", "manySplits_6_1");
@@ -216,10 +211,9 @@ startup {
 
     vars.lastChapter = 0; // used by seal the deal split
     vars.splitInLoadScreen = false;
-    vars.splitsLockTimer = new Stopwatch();
-    vars.splitsLockTimer.Start();
     vars.currentRift = "none"; // indicates the current time rift, none -> not in a rift
     vars.justEnteredRift = false;
+    vars.posSplitKey = 0f; // key for a position split to trigger, 0f -> no key currently in use
 }
 
 init {
@@ -296,23 +290,59 @@ init {
         vars.timePieceCount
     };
 
-    // for certain conditions that need hat kid's position to work
-    Func <int, int, bool, float, float, float, bool> ShouldSplitAtThisPos = (int chapter, int act, bool timerChangedState, float x, float y, float z) => {
-    return(chapter == 4 && (act != 4  && settings["4_birdhouse"] && x > -24000f&& x < -23000f&& y > 29000f  && y < 30500f && z > 4000f  && z < 6000f  ||   // birdhouse arrival
-                            act != 3  && settings["4_lava_cake"] && x > 3000f  && x < 30400f && y > -28500f && y < -27353f&& z > 3200f  && z < 4000f  ||   // lava cake arrival
-                            act != 13 && settings["4_windmill"]  && x > 71600f && x < 72300f && y > 21500f  && y < 22700f && z > 1500f  && z < 2100f  ||   // windmill arrival
-                            act != 15 && settings["4_twilight"]  && x > 4600f  && x < 8700f  && y > 69000f  && y < 70000f && z > 4000f  && z < 5400f  ||   // twilight bell arrival
-                            settings["4_illness_bh"]   && x > -20000f && x < -10000f && y > 45000f  && y < 52500f && z < -9680f                       ||   // illness birdhouse warp
-                            settings["4_illness_wind"] && x > 38000f  && x < 47000f  && y > 28000f  && y < 34000f && z < -9680f)                      ||   // illness windmill warp
-            chapter == 5 && settings["manySplits_5_slap"] && x > -38300f && x <-38190f && y > -85000f && y <-84000f && z >-59900f && z <-59000f       ||   // slap (5-1)
-            
-            timerChangedState  &&  (chapter == 1 && settings["manySplits_1_4_cp0_pause_pos"] && x > 3500f  && x < 4500f  && y > -3500f  && y < -3000f && z > 8000f  && z < 9000f    ||   // mafia boss enter HQ (1-4)
-                                    chapter == 2 && settings["manySplits_2_6_cp0_pause_pos"] && x > 5500f  && x < 9500f  && y > 8200f   && y < 12000f && z < 5000f                  ||   // basement boss entry (2-6)
-                                    chapter == 3 && settings["manySplits_3_2_cp0_pause_pos"] && x > 15800f && x < 17000f && y > 10900f  && y < 11900f && z < 2000f                  ||   // inside well (3-2)
-                                    chapter == 3 && settings["manySplits_3_4_cp0_pause_pos"] && x > -28000f&& x < -26000f&& y > 2000f   && y < 3400f  && z > 200f   && z < 1200f    ||   // qvm inside manor (3-4)
-                                    chapter == 4 && settings["manySplits_4_99_cp0_pause_pos"]&& x > 37000f && x < 41000f && y > 47000f  && y < 51000f && z > -14000f&& z < -5000f ));    // alpine intro (4-99)
+    // volume "keys" that enable the volume split triggers
+    // the main idea is making a volume trigger a split only when hat kid has gone through a certain other volume right before, determined using a key
+    // format of lists: {min x, max x, min y, max y, min z, max z, key for position splits}
+    // -2f: ignored coordinate
+    Dictionary<int, List<List<float>>> posSplitKeysDict = new Dictionary<int, List<List<float>>>();
+
+    List<List<float>> posVolumeKeysChFour = new List<List<float>>();
+    posVolumeKeysChFour.Add (new List<float>() {-11000f, -9000f,  32000f,  34000f,  -1000f, 500f,  40f});  // birdhouse arrival
+    posVolumeKeysChFour.Add (new List<float>() {36500f,  38000f,  -13000f, -11000f, 4500f,  5500f, 41f});  // lava cake arrival
+    posVolumeKeysChFour.Add (new List<float>() {47000f,  49000f,  21000f,  22000f,  1000f,  2500f, 42f});  // windmill arrival
+    posVolumeKeysChFour.Add (new List<float>() {7000f,   8500f,   43000f,  45000,   -1000f, 1000f, 43f});  // twilight bell arrival
+    posVolumeKeysChFour.Add (new List<float>() {-15500f, -14000f, 47400f,  49000f,  -2000f, 0f,    44f});  // illness birdhouse warp
+    posVolumeKeysChFour.Add (new List<float>() {41000f,  42500f,  29000f,  30500f,  2000f,  3500f, 45f});  // illness windmill warp
+    posSplitKeysDict.Add (4, posVolumeKeysChFour);
+
+    List<List<float>> posVolumeKeysChFive = new List<List<float>>();
+    posVolumeKeysChFive.Add (new List<float>() {-30000f, -28000f, -2f, -2f, -2f, -2f, 5f}); // slap (5-1)
+    posSplitKeysDict.Add (5, posVolumeKeysChFive);
+
+    vars.posSplitKeysDict = posSplitKeysDict;
+
+    // position splits that use a key given by the "volume keys" dictionary
+    Dictionary<float, float[]> posSplitsDict = new Dictionary<float, float[]>();
+    posSplitsDict.Add(40f, new float[6] {-24000f,  -23000f, 29000f,   30500f,   4000f,  6000f});    // birdhouse arrival
+    posSplitsDict.Add(41f, new float[6] {3000f,    30400f,  -28500f,  -27353f,  3200f,  4000f});    // lava cake arrival
+    posSplitsDict.Add(42f, new float[6] {71600f,   72300f,  21500f,   22700f,   1500f,  2100f});    // windmill arrival
+    posSplitsDict.Add(43f, new float[6] {4600f,    8700f,   69000f,   70000f,   4000f,  5400f});    // twilight bell arrival
+    posSplitsDict.Add(44f, new float[6] {-2f,      -2f,     -2f,      -2f,      -2f,    -9680f});   // illness birdhouse warp
+    posSplitsDict.Add(45f, new float[6] {-2f,      -2f,     -2f,      -2f,      -2f,    -4230f});   // illness windmill warp
+    posSplitsDict.Add(5f,  new float[6] {-38300f,  -38190f, -85000f,  -84000f,  -2f,    -2f});      // slap (5-1)
+    vars.posSplitsDict = posSplitsDict;
+
+    // positions/volumes that trigger a split when their "volume key" is active
+    Func <float, float, float, float[], bool> ShouldSplitAtThisPos = (float x, float y, float z, float[] position) => {
+        if ((x > position[0] || position[0] == -2f) && (x < position[1] || position[1] == -2f) && 
+            (y > position[2] || position[2] == -2f) && (y < position[3] || position[3] == -2f) && 
+            (z > position[4] || position[4] == -2f) && (z < position[5] || position[5] == -2f)){
+            vars.posSplitKey = 0f;
+            return true;
+            }
+        return false;
     };
     vars.ShouldSplitAtThisPos = ShouldSplitAtThisPos;
+
+    // for certain splits that trigger when the timer is paused/unpaused while hat kid is at a certain position
+    Func <int, float, float, float, bool> ShouldSplitAtThisPosPause = (int chapter, float x, float y, float z) => {
+    return  chapter == 1 && settings["manySplits_1_4_cp0_pause_pos"] && x > 3500f  && x < 4500f  && y > -3500f  && y < -3000f && z > 8000f  && z < 9000f    ||   // enter mafia HQ (1-4)
+            chapter == 2 && settings["manySplits_2_6_cp0_pause_pos"] && x > 5500f  && x < 9500f  && y > 8200f   && y < 12000f && z < 5000f                  ||   // basement boss entry (2-6)
+            chapter == 3 && settings["manySplits_3_2_cp0_pause_pos"] && x > 15800f && x < 17000f && y > 10900f  && y < 11900f && z < 2000f                  ||   // inside well (3-2)
+            chapter == 3 && settings["manySplits_3_4_cp0_pause_pos"] && x > -28000f&& x < -26000f&& y > 2000f   && y < 3400f  && z > 200f   && z < 1200f    ||   // qvm inside manor (3-4)
+            chapter == 4 && settings["manySplits_4_99_cp0_pause_pos"]&& x > 37000f && x < 41000f && y > 47000f  && y < 51000f && z > -14000f&& z < -5000f;       // alpine intro (4-99)
+    };
+    vars.ShouldSplitAtThisPosPause = ShouldSplitAtThisPosPause;
 
     // returns the current rift based on hat kid's position
     Func <int, float, float, float, string> CurrentRiftCheck = (int chapter, float x, float y, float z) => {
@@ -364,56 +394,29 @@ init {
     };
     vars.BackToHubCheck = BackToHubCheck;
 
-
-
-
-
-
-    // borrarrrrrrrrrrrrrrr
-
-    // updates a text component in the layout, also creates it if it doesn't exist
-	Action <string, string> UpdateTextComponent = (string name, string updatedText) => {
-		bool foundComponent = false;
-		foreach (dynamic component in timer.Layout.Components){
-			if (component.GetType().Name != "TextComponent" || component.Settings.Text1 != name) continue;
-			component.Settings.Text2 = updatedText;
-			foundComponent = true;
-			break;
-		}
-		if (!foundComponent) vars.CreateTextComponent(name, updatedText);
-	};
-	vars.UpdateTextComponent = UpdateTextComponent;
-	
-	// creates a text component, used when UpdateTextComponent doens't find the text component requested
-	Action <string, string> CreateTextComponent = (string textLeft, string textRight) => {
-		var textComponentAssembly = Assembly.LoadFrom("Components\\LiveSplit.Text.dll");
-		dynamic textComponent = Activator.CreateInstance(textComponentAssembly.GetType("LiveSplit.UI.Components.TextComponent"), timer);
-		timer.Layout.LayoutComponents.Add(new LiveSplit.UI.Components.LayoutComponent("LiveSplit.Text.dll", textComponent as LiveSplit.UI.Components.IComponent));
-		textComponent.Settings.Text1 = textLeft;
-		textComponent.Settings.Text2 = textRight;
-	};
-	vars.CreateTextComponent = CreateTextComponent;
-
-
 }
 
 update {
     vars.watchers.UpdateAll(game);
+
     if (version != "Undetected"){
         if (current.chapter != old.chapter){
             vars.lastChapter = old.chapter;
         }
+        // delayed time piece split activation
         if ((vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && settings["manySplits_" + current.chapter + "_" + current.act + "_tpDelayed"]){
             vars.splitInLoadScreen = true;
         }
+        // actions taken when timer unpauses
         if (vars.gameTimerIsPaused.Current == 0 && vars.gameTimerIsPaused.Old == 1){
             vars.splitInLoadScreen = false;
+            vars.posSplitKey = 0f;
             vars.currentRift = (vars.BackToHubCheck(current.chapter, current.x, current.y, current.z) ? "none" : vars.currentRift);
         }
         if (vars.timerState.Current == 0){
             vars.currentRift = "none";
         }
-        
+
         if (vars.justEnteredRift){
             vars.justEnteredRift = false;
         }
@@ -424,8 +427,17 @@ update {
                 vars.justEnteredRift = true;
             }
         }
+        // position split key detection
+        if (current.chapter == 4 || current.chapter == 5){
+            foreach (var position in vars.posSplitKeysDict[current.chapter]){ 
+                if ((current.x > position[0] || position[0] == -2f) && (current.x < position[1] || position[1] == -2f) && 
+                    (current.y > position[2] || position[2] == -2f) && (current.y < position[3] || position[3] == -2f) && 
+                    (current.z > position[4] || position[4] == -2f) && (current.z < position[5] || position[5] == -2f)){
+                    vars.posSplitKey = position[6];
+                }
+            }
+        }
     }
-    vars.UpdateTextComponent("Rift", vars.currentRift);
 }
 
 start {
@@ -436,57 +448,49 @@ start {
 
 split {
 
-    if (vars.timerState.Current != 0
-        &&
-        settings["splits"] 
+    return  vars.timerState.Current != 0
             &&
-            (
-            vars.timePieceCount.Current == vars.timePieceCount.Old + 1 && settings["splits_tp_new"]  // new time piece
+            settings["splits"] 
+                &&
+                (
+                vars.timePieceCount.Current == vars.timePieceCount.Old + 1 && settings["splits_tp_new"]  // new time piece
+                ||
+                vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && settings["splits_tp_any"]  // any time piece
+                ||
+                vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && version != "Undetected" && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"]  // seal the deal
+                ||
+                vars.gameTimerIsPaused.Old == 1 && vars.gameTimerIsPaused.Current == 0 && (vars.realActTime.Current == 0f || vars.realActTime.Old == 0f) && settings["splits_actEntry"] && vars.currentRift == "none" && !settings["settings_ILMode"] // act entry
+                ||
+                version != "Undetected" && current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"]  // death wish back to hub
+                )
             ||
-            vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && settings["splits_tp_any"]  // any time piece
+            settings["manySplits"] && version != "Undetected" && vars.currentRift == "none"
+                &&
+                (
+                (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && (settings["manySplits_" + current.chapter + "_" + current.act + "_tp"] || settings["manySplits_" + current.chapter + "_tp"])  // custom time pieces
+                ||
+                current.checkpoint != old.checkpoint && settings["manySplits_" + current.chapter + "_" + current.act + "_cp" + current.checkpoint] // new act checkpoint
+                ||
+                vars.posSplitKey != 0f && settings["manySplits_pos_" + vars.posSplitKey.ToString()] && vars.ShouldSplitAtThisPos(current.x, current.y, current.z, vars.posSplitsDict[vars.posSplitKey]) // position splits
+                ||
+                vars.splitInLoadScreen && vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0  // delayed custom time pieces
+                ||
+                vars.realActTime.Old == 0f && vars.gameTimerIsPaused.Current == 0 && vars.gameTimerIsPaused.Old == 1 && !settings["settings_ILMode"] && (settings["manySplits_" + current.chapter + "_" + current.act + "_entry"] || settings["manySplits_" + current.chapter + "_entry"]) // custom act entry
+                ||
+                vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0 && settings["manySplits_" + current.chapter + "_" + current.act + "_cp" + current.checkpoint + "_pause"] // paused with certain checkpoint
+                ||
+                vars.gameTimerIsPaused.Changed && vars.ShouldSplitAtThisPosPause(current.chapter, current.x, current.y, current.z) // position splits when timer is paused / unpaused
+                )
             ||
-            vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && version != "Undetected" && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"]  // seal the deal
-            ||
-            vars.gameTimerIsPaused.Old == 1 && vars.gameTimerIsPaused.Current == 0 && (vars.realActTime.Current == 0f || vars.realActTime.Old == 0f) && settings["splits_actEntry"] && vars.currentRift == "none" && !settings["settings_ILMode"] // act entry
-            ||
-            version != "Undetected" && current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"]  // death wish back to hub
-            )
-        ||
-        settings["manySplits"] && version != "Undetected" && vars.currentRift == "none"
-            &&
-            (
-            (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && (settings["manySplits_" + current.chapter + "_" + current.act + "_tp"] || settings["manySplits_" + current.chapter + "_tp"])  // custom time pieces
-            ||
-            current.checkpoint != old.checkpoint && settings["manySplits_" + current.chapter + "_" + current.act + "_cp" + current.checkpoint] // new act checkpoint
-            ||
-            vars.splitInLoadScreen && vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0  // delayed custom time pieces
-            ||
-            vars.realActTime.Old == 0f && vars.gameTimerIsPaused.Current == 0 && vars.gameTimerIsPaused.Old == 1 && !settings["settings_ILMode"] && (settings["manySplits_" + current.chapter + "_" + current.act + "_entry"] || settings["manySplits_" + current.chapter + "_entry"]) // custom act entry
-            ||
-            vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0 && settings["manySplits_" + current.chapter + "_" + current.act + "_cp" + current.checkpoint + "_pause"] // paused with certain checkpoint
-            )
-        ||
-        settings["manySplits"] && vars.currentRift != "none"
-            &&
-            (
-            (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && (settings[vars.currentRift + "_tp"]) // custom time piece (rifts)
-            ||
-            current.checkpoint > old.checkpoint && settings[vars.currentRift + "_cp"] // new purple rift checkpoint
-            ||
-            vars.justEnteredRift && settings[vars.currentRift + "_entry"] && !settings["settings_ILMode"] // rift entry
-            )
-        )
-    {
-        return true;
-    }
-
-    // all position splits
-    else if (settings["manySplits"] && version != "Undetected" && vars.ShouldSplitAtThisPos(current.chapter, current.act, vars.gameTimerIsPaused.Changed, current.x, current.y, current.z) && vars.splitsLockTimer.ElapsedMilliseconds > 10000){
-        vars.splitsLockTimer.Restart();
-        return true;
-    }
-
-    return false;
+            settings["manySplits"] && vars.currentRift != "none"
+                &&
+                (
+                (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && (settings[vars.currentRift + "_tp"]) // custom time piece (rifts)
+                ||
+                current.checkpoint > old.checkpoint && settings[vars.currentRift + "_cp"] // new purple rift checkpoint
+                ||
+                vars.justEnteredRift && settings[vars.currentRift + "_entry"] && !settings["settings_ILMode"] // rift entry
+                );
 }
 
 reset {
