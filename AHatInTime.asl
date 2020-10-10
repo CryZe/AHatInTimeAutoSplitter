@@ -214,6 +214,14 @@ startup {
     vars.currentRift = "none"; // indicates the current time rift, none -> not in a rift
     vars.justEnteredRift = false;
     vars.posSplitKey = 0f; // key for a position split to trigger, 0f -> no key currently in use
+    vars.splitsLock = new Stopwatch(); // prevents double splits
+    vars.splitsLock.Start();
+
+    vars.splitActions = (EventHandler)((s, e) => {
+        vars.splitsLock.Restart();
+        vars.posSplitKey = 0f;
+    });
+    timer.OnSplit += vars.splitActions;
 }
 
 init {
@@ -290,28 +298,29 @@ init {
         vars.timePieceCount
     };
 
-    // volume "keys" that enable the volume split triggers
-    // the main idea is making a volume trigger a split only when hat kid has gone through a certain other volume right before, determined using a key
+    // volume "keys" dictionary that enables the volume split triggers
+    // the main idea is making a volume trigger a split only when hat kid has gone through a certain other volume right before
+    // key: chapter number, value: list of lists with coordinates of key volumes
     // format of lists: {min x, max x, min y, max y, min z, max z, key for position splits}
     // -2f: ignored coordinate
     Dictionary<int, List<List<float>>> posSplitKeysDict = new Dictionary<int, List<List<float>>>();
 
     List<List<float>> posVolumeKeysChFour = new List<List<float>>();
-    posVolumeKeysChFour.Add (new List<float>() {-11000f, -9000f,  32000f,  34000f,  -1000f, 500f,  40f});  // birdhouse arrival
-    posVolumeKeysChFour.Add (new List<float>() {36500f,  38000f,  -13000f, -11000f, 4500f,  5500f, 41f});  // lava cake arrival
-    posVolumeKeysChFour.Add (new List<float>() {47000f,  49000f,  21000f,  22000f,  1000f,  2500f, 42f});  // windmill arrival
-    posVolumeKeysChFour.Add (new List<float>() {7000f,   8500f,   43000f,  45000,   -1000f, 1000f, 43f});  // twilight bell arrival
-    posVolumeKeysChFour.Add (new List<float>() {-15500f, -14000f, 47400f,  49000f,  -2000f, 0f,    44f});  // illness birdhouse warp
-    posVolumeKeysChFour.Add (new List<float>() {41000f,  42500f,  29000f,  30500f,  2000f,  3500f, 45f});  // illness windmill warp
+    posVolumeKeysChFour.Add (new List<float>() {-11000f, -9000f,  32000f,  34000f,  -1000f, 500f,   40f});  // birdhouse arrival (start of zipline)
+    posVolumeKeysChFour.Add (new List<float>() {36500f,  38000f,  -13000f, -11000f, 4500f,  5500f,  41f});  // lava cake arrival (start of zipline)
+    posVolumeKeysChFour.Add (new List<float>() {47000f,  49000f,  21000f,  22000f,  1000f,  2500f,  42f});  // windmill arrival (start of zipline)
+    posVolumeKeysChFour.Add (new List<float>() {7000f,   8500f,   43000f,  45000,   -1000f, 1000f,  43f});  // twilight bell arrival (start of zipline)
+    posVolumeKeysChFour.Add (new List<float>() {-15300f, -14400f, 47750f,  49000f,  -1650f, -1300f, 44f});  // illness birdhouse warp (close to plant)
+    posVolumeKeysChFour.Add (new List<float>() {41000f,  42500f,  29000f,  30500f,  2400f,  2800f,  45f});  // illness windmill warp (close to plant)
     posSplitKeysDict.Add (4, posVolumeKeysChFour);
 
     List<List<float>> posVolumeKeysChFive = new List<List<float>>();
-    posVolumeKeysChFive.Add (new List<float>() {-30000f, -28000f, -2f, -2f, -2f, -2f, 5f}); // slap (5-1)
+    posVolumeKeysChFive.Add (new List<float>() {-30000f, -28000f, -2f, -2f, -2f, -2f, 5f}); // slap (around to the final pillars)
     posSplitKeysDict.Add (5, posVolumeKeysChFive);
 
     vars.posSplitKeysDict = posSplitKeysDict;
 
-    // position splits that use a key given by the "volume keys" dictionary
+    // position splits dictionary that uses a key given by the "volume keys" dictionary
     Dictionary<float, float[]> posSplitsDict = new Dictionary<float, float[]>();
     posSplitsDict.Add(40f, new float[6] {-24000f,  -23000f, 29000f,   30500f,   4000f,  6000f});    // birdhouse arrival
     posSplitsDict.Add(41f, new float[6] {3000f,    30400f,  -28500f,  -27353f,  3200f,  4000f});    // lava cake arrival
@@ -322,15 +331,11 @@ init {
     posSplitsDict.Add(5f,  new float[6] {-38300f,  -38190f, -85000f,  -84000f,  -2f,    -2f});      // slap (5-1)
     vars.posSplitsDict = posSplitsDict;
 
-    // positions/volumes that trigger a split when their "volume key" is active
+    // position splits, note that these are only checked when their "volume key" is found in vars.poSplitKey
     Func <float, float, float, float[], bool> ShouldSplitAtThisPos = (float x, float y, float z, float[] position) => {
-        if ((x > position[0] || position[0] == -2f) && (x < position[1] || position[1] == -2f) && 
-            (y > position[2] || position[2] == -2f) && (y < position[3] || position[3] == -2f) && 
-            (z > position[4] || position[4] == -2f) && (z < position[5] || position[5] == -2f)){
-            vars.posSplitKey = 0f;
-            return true;
-            }
-        return false;
+        return ((x > position[0] || position[0] == -2f) && (x < position[1] || position[1] == -2f) && 
+                (y > position[2] || position[2] == -2f) && (y < position[3] || position[3] == -2f) && 
+                (z > position[4] || position[4] == -2f) && (z < position[5] || position[5] == -2f));
     };
     vars.ShouldSplitAtThisPos = ShouldSplitAtThisPos;
 
@@ -447,25 +452,27 @@ start {
 }
 
 split {
-
-    return  vars.timerState.Current != 0
+    return  vars.splitsLock.ElapsedMilliseconds > 1000
             &&
+            vars.timerState.Current != 0
+            &&
+            (
             settings["splits"] 
-                &&
+            &&
                 (
                 vars.timePieceCount.Current == vars.timePieceCount.Old + 1 && settings["splits_tp_new"]  // new time piece
                 ||
                 vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && settings["splits_tp_any"]  // any time piece
                 ||
-                vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && version != "Undetected" && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"]  // seal the deal
+                vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && version != "Undetected" && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"]  // seal the deal time piece
                 ||
-                vars.gameTimerIsPaused.Old == 1 && vars.gameTimerIsPaused.Current == 0 && (vars.realActTime.Current == 0f || vars.realActTime.Old == 0f) && settings["splits_actEntry"] && vars.currentRift == "none" && !settings["settings_ILMode"] // act entry
+                vars.gameTimerIsPaused.Old == 1 && vars.gameTimerIsPaused.Current == 0 && (vars.realActTime.Old == 0f || vars.realActTime.Old > vars.realActTime.Current) && settings["splits_actEntry"] && vars.currentRift == "none" && !settings["settings_ILMode"] // act entry
                 ||
                 version != "Undetected" && current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"]  // death wish back to hub
                 )
             ||
             settings["manySplits"] && version != "Undetected" && vars.currentRift == "none"
-                &&
+            &&
                 (
                 (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && (settings["manySplits_" + current.chapter + "_" + current.act + "_tp"] || settings["manySplits_" + current.chapter + "_tp"])  // custom time pieces
                 ||
@@ -475,7 +482,7 @@ split {
                 ||
                 vars.splitInLoadScreen && vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0  // delayed custom time pieces
                 ||
-                vars.realActTime.Old == 0f && vars.gameTimerIsPaused.Current == 0 && vars.gameTimerIsPaused.Old == 1 && !settings["settings_ILMode"] && (settings["manySplits_" + current.chapter + "_" + current.act + "_entry"] || settings["manySplits_" + current.chapter + "_entry"]) // custom act entry
+                vars.gameTimerIsPaused.Old == 1 && vars.gameTimerIsPaused.Current == 0 && (vars.realActTime.Old == 0f || vars.realActTime.Old > vars.realActTime.Current) && !settings["settings_ILMode"] && (settings["manySplits_" + current.chapter + "_" + current.act + "_entry"] || settings["manySplits_" + current.chapter + "_entry"]) // custom act entry
                 ||
                 vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0 && settings["manySplits_" + current.chapter + "_" + current.act + "_cp" + current.checkpoint + "_pause"] // paused with certain checkpoint
                 ||
@@ -483,14 +490,15 @@ split {
                 )
             ||
             settings["manySplits"] && vars.currentRift != "none"
-                &&
+            &&
                 (
                 (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && (settings[vars.currentRift + "_tp"]) // custom time piece (rifts)
                 ||
                 current.checkpoint > old.checkpoint && settings[vars.currentRift + "_cp"] // new purple rift checkpoint
                 ||
                 vars.justEnteredRift && settings[vars.currentRift + "_entry"] && !settings["settings_ILMode"] // rift entry
-                );
+                )
+            );
 }
 
 reset {
@@ -505,4 +513,8 @@ isLoading {
 
 gameTime {
     return settings["settings_ILMode"] ? TimeSpan.FromSeconds(vars.realActTime.Current) : TimeSpan.FromSeconds(vars.realGameTime.Current);
+}
+
+shutdown {
+    timer.OnSplit -= vars.splitActions;
 }
