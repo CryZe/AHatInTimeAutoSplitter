@@ -425,7 +425,7 @@ update {
             vars.justEnteredRift = false;
         }
         // rift entry detection
-        if (vars.gameTimerIsPaused.Changed && vars.currentRift == "none" && settings["manySplits"]){
+        if (vars.gameTimerIsPaused.Changed && vars.currentRift == "none"){
             vars.currentRift = vars.CurrentRiftCheck(current.chapter, current.x, current.y, current.z);
             if (vars.currentRift != "none"){
                 vars.justEnteredRift = true;
