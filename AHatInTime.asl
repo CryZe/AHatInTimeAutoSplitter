@@ -225,7 +225,6 @@ startup {
 }
 
 init {
-
     if (timer.CurrentTimingMethod == TimingMethod.RealTime && settings["settings_gameTimeMsg"]){
         var message = MessageBox.Show(
             "Would you like to change the current timing method to\nGame Time instead of Real Time?", 
