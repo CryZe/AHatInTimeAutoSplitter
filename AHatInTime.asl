@@ -76,7 +76,7 @@ startup {
     settings.Add("splits_tp_std", true, "Seal The Deal", "splits_tp");
     settings.SetToolTip("splits_tp_std", "End of Death Wish Any%.\nOnly works on detected patches.");
     settings.Add("splits_actEntry", false, "Act Entries");
-    settings.SetToolTip("splits_actEntry", "When using undetected patches it will also trigger for time rifts in the spaceship.");
+    settings.SetToolTip("splits_actEntry", "Also for Time Rifts in the spaceship.");
     settings.Add("splits_dwbth", false, "Death Wish Level Back to Hub");
     settings.SetToolTip("splits_dwbth", "Only works on detected patches.");
     settings.CurrentDefaultParent = null;
@@ -465,7 +465,7 @@ split {
                 ||
                 vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && version != "Undetected" && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"]  // seal the deal time piece
                 ||
-                vars.gameTimerIsPaused.Old == 1 && vars.gameTimerIsPaused.Current == 0 && (vars.realActTime.Old == 0f || vars.realActTime.Old > vars.realActTime.Current) && settings["splits_actEntry"] && vars.currentRift == "none" && !settings["settings_ILMode"] // act entry
+                vars.gameTimerIsPaused.Old == 1 && vars.gameTimerIsPaused.Current == 0 && (vars.realActTime.Old == 0f || vars.realActTime.Old > vars.realActTime.Current) && settings["splits_actEntry"] && !settings["settings_ILMode"] // act entry or spaceship rift entry
                 ||
                 version != "Undetected" && current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"]  // death wish back to hub
                 )
