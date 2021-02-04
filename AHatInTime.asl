@@ -494,13 +494,17 @@ split {
                 ||
                 vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && settings["splits_tp_any"]  // any time piece
                 ||
-                vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && version != "Undetected" && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"]  // seal the deal time piece
-                ||
                 vars.actTimerIsVisible.Current == 1 && vars.actTimerIsVisible.Old == 0 && settings["splits_actEntry"] && !settings["settings_ILMode"] // act entry or spaceship rift entry
                 ||
-                version != "Undetected" && current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"] && (settings["splits_dwbth_doubleSplitNo"] && vars.splitsLock.ElapsedMilliseconds > 9000 || !settings["splits_dwbth_doubleSplitNo"])  // death wish back to hub
-                ||
-                current.yarn == old.yarn + 1 && version != "Undetected" && settings["splits_yarn"] // yarn
+                version != "Undetected" 
+                &&
+                    (
+                    vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0  && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"]  // seal the deal time piece
+                    ||
+                    current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"] && (settings["splits_dwbth_doubleSplitNo"] && vars.splitsLock.ElapsedMilliseconds > 9000 || !settings["splits_dwbth_doubleSplitNo"])  // death wish back to hub
+                    ||
+                    current.yarn == old.yarn + 1 && settings["splits_yarn"] // yarn
+                    )
                 )
             ||
             settings["manySplits"] && version != "Undetected" && vars.currentRift == "none"
