@@ -6,6 +6,7 @@ state("HatinTimeGame", "DLC 2.1") {
     int chapter : 0x011E1570, 0x68, 0x108;
     int act : 0x011E1570, 0x68, 0x10C;
     int checkpoint : 0x011E1570, 0x68, 0x110;
+    int yarn : 0x011E1570, 0x68, 0xF0;
 }
 
 state("HatinTimeGame", "110% Patch") {
@@ -16,6 +17,18 @@ state("HatinTimeGame", "110% Patch") {
     int chapter : 0x0121F280, 0x68, 0x108;
     int act : 0x0121F280, 0x68, 0x10C;
     int checkpoint : 0x0121F280, 0x68, 0x110;
+    int yarn : 0x0121F280, 0x68, 0xF0;
+}
+
+state("HatinTimeGame", "TAS Patch") {
+    float x : 0x011F6F10, 0x6DC, 0x00, 0x68, 0x51C, 0x80;
+    float y : 0x011F6F10, 0x6DC, 0x00, 0x68, 0x51C, 0x84;
+    float z : 0x011F6F10, 0x6DC, 0x00, 0x68, 0x51C, 0x88;
+
+    int chapter : 0x0121C1A0, 0x68, 0x108;
+    int act : 0x0121C1A0, 0x68, 0x10C;
+    int checkpoint : 0x0121C1A0, 0x68, 0x110;
+    int yarn : 0x0121C1A0, 0x68, 0xF0;
 }
 
 state("HatinTimeGame", "DLC 1.5") {
@@ -26,6 +39,7 @@ state("HatinTimeGame", "DLC 1.5") {
     int chapter: 0x011E7550, 0x68, 0x108;
     int act : 0x011E7550, 0x68, 0x10C;
     int checkpoint : 0x011E7550, 0x68, 0x110;
+    int yarn : 0x011E7550, 0x68, 0xF0;
 }
 
 state("HatinTimeGame", "Modding") {
@@ -36,6 +50,7 @@ state("HatinTimeGame", "Modding") {
     int chapter : 0x011475A8, 0x64, 0xF8;
     int act : 0x011475A8, 0x64, 0xFC;
     int checkpoint : 0x011475A8, 0x64, 0x100;
+    int yarn : 0x011475A8, 0x64, 0xE0;
 }
 
 startup {
@@ -63,8 +78,6 @@ startup {
     settings.SetToolTip("settings_ILMode", "This will also start the timer when the act timer is at 0, and reset when using \"restartil\" or exiting a level.");
     settings.Add("settings_newFileStart", true, "Only start the timer when opening an empty file");
     settings.Add("settings_gameTimeMsg", true, "Ask if Game Time should be used when the game opens");
-    settings.Add("settings_noResetIntro", false, "Avoid resetting when going back to main menu after starting a new file");
-    settings.SetToolTip("settings_noResetIntro", "Timer won't reset at hat kid's room when she has 0 timpepieces.\nOnly works on detected patches.");
 
     settings.CurrentDefaultParent = null;
     settings.Add("splits", true, "Simple Splits");
@@ -79,6 +92,10 @@ startup {
     settings.SetToolTip("splits_actEntry", "Also for Time Rifts in the spaceship.");
     settings.Add("splits_dwbth", false, "Death Wish Level Back to Hub");
     settings.SetToolTip("splits_dwbth", "Only works on detected patches.");
+    settings.Add("splits_dwbth_doubleSplitNo", true, "Avoid Double Splits", "splits_dwbth");
+    settings.SetToolTip("splits_dwbth_doubleSplitNo", "Useful for 110%,\nIf another split triggered recently, the Death Wish Back to Hub split won't trigger.");
+    settings.Add("splits_yarn", false, "Yarn");
+    settings.SetToolTip("splits_yarn", "Only works on detected patches.");
     settings.CurrentDefaultParent = null;
 
     settings.Add("manySplits", false, "Detailed Splits");
@@ -225,6 +242,7 @@ startup {
 }
 
 init {
+
     if (timer.CurrentTimingMethod == TimingMethod.RealTime && settings["settings_gameTimeMsg"]){
         var message = MessageBox.Show(
             "Would you like to change the current timing method to\nGame Time instead of Real Time?", 
@@ -238,6 +256,7 @@ init {
     switch (modules.First().ModuleMemorySize) {
         case 0x13AF000: version = "DLC 2.1"; break;
         case 0x13F0000: version = "110% Patch"; break;
+        case 0x13ED000: version = "TAS Patch"; break;
         case 0x13B3000: version = "DLC 1.5"; break;
         case 0x1260000: version = "Modding"; break;
         default: version = "Undetected"; break;
@@ -308,7 +327,7 @@ init {
     posVolumeKeysChFour.Add (new List<float>() {-11000f, -9000f,  32000f,  34000f,  -1000f, 500f,   40f});  // birdhouse arrival (start of zipline)
     posVolumeKeysChFour.Add (new List<float>() {36500f,  38000f,  -13000f, -11000f, 4500f,  5500f,  41f});  // lava cake arrival (start of zipline)
     posVolumeKeysChFour.Add (new List<float>() {47000f,  49000f,  21000f,  22000f,  1000f,  2500f,  42f});  // windmill arrival (start of zipline)
-    posVolumeKeysChFour.Add (new List<float>() {7000f,   8500f,   43000f,  45000,   -1000f, 1000f,  43f});  // twilight bell arrival (start of zipline)
+    posVolumeKeysChFour.Add (new List<float>() {7000f,   8500f,   43000f,  45000f,  -1000f, 1000f,  43f});  // twilight bell arrival (start of zipline)
     posVolumeKeysChFour.Add (new List<float>() {-15300f, -14400f, 47750f,  49000f,  -1650f, -1300f, 44f});  // illness birdhouse warp (close to plant)
     posVolumeKeysChFour.Add (new List<float>() {41000f,  42500f,  29000f,  30500f,  2400f,  2800f,  45f});  // illness windmill warp (close to plant)
     posSplitKeysDict.Add (4, posVolumeKeysChFour);
@@ -341,16 +360,17 @@ init {
     // for certain splits that trigger when the timer is paused/unpaused while hat kid is at a certain position
     Func <int, float, float, float, bool> ShouldSplitAtThisPosPause = (int chapter, float x, float y, float z) => {
     return  chapter == 1 && settings["manySplits_1_4_cp0_pause_pos"] && x > 3500f  && x < 4500f  && y > -3500f  && y < -3000f && z > 8000f  && z < 9000f    ||   // enter mafia HQ (1-4)
-            chapter == 2 && settings["manySplits_2_6_cp0_pause_pos"] && x > 5500f  && x < 9500f  && y > 8200f   && y < 12000f && z < 5000f                  ||   // basement boss entry (2-6)
+            chapter == 2 && settings["manySplits_2_6_cp0_pause_pos"] && x > 5500f  && x < 9500f  && y > 5000f   && y < 12000f && z < 4000f                  ||   // basement boss entry (2-6)
             chapter == 3 && settings["manySplits_3_2_cp0_pause_pos"] && x > 15800f && x < 17000f && y > 10900f  && y < 11900f && z < 2000f                  ||   // inside well (3-2)
             chapter == 3 && settings["manySplits_3_4_cp0_pause_pos"] && x > -28000f&& x < -26000f&& y > 2000f   && y < 3400f  && z > 200f   && z < 1200f    ||   // qvm inside manor (3-4)
             chapter == 4 && settings["manySplits_4_99_cp0_pause_pos"]&& x > 37000f && x < 41000f && y > 47000f  && y < 51000f && z > -14000f&& z < -5000f;       // alpine intro (4-99)
     };
     vars.ShouldSplitAtThisPosPause = ShouldSplitAtThisPosPause;
 
-    // returns the current rift based on hat kid's position
+    // returns the current rift based on hat kid's position, it's using either the rift orb to enter them or hat kid's position at the start of them
     Func <int, float, float, float, string> CurrentRiftCheck = (int chapter, float x, float y, float z) => {
-        // purple rifts are detected with the rift orb OR hat kid's position at the start of them
+        
+        // purple rifts 
         if      (chapter == 1 && x > 4070f  && x < 4250f  && y > -5550f  && y < -5350f  && z > -900f  && z < -700f ||
                                  x > 13200f && x < 13250f && y > -120f   && y < -80f    && z > -250f )               return "manySplits_riftPurple_moc";
         else if (chapter == 2 && x > 8350f  && x < 8500f  && y > -2250f  && y < -2100f  && z > 2700f  && z < 2870f ||
@@ -366,18 +386,29 @@ init {
         else if (                x > -4220f && x < -4120f && y > -800f   && y < -710f   && z > 1300f && z < 1500f  ||
                                  x > 13100f && x < 13200f && y > -250f   && y < -200f   && z > 2650f)                return "manySplits_riftPurple_tour";
         
-        // blue rifts are detected with hat kid's position at the start of them
-        else if (chapter == 1 && x > -200f  && x < -150f  && y > -410f   && y < -360f   && z > 60f   && z < 120f)  return "manySplits_riftBlue_sewers";
-        else if (chapter == 1 && x > -200f  && x < -150f  && y > -150f   && y < -120f   && z > 60f   && z < 120f)  return "manySplits_riftBlue_bazaar";
-        else if (chapter == 2 && x > -2710f && x < -2500f && y > 1020f   && y < 1230f   && z > 10f   && z < 100f)  return "manySplits_riftBlue_owlExpress";
-        else if (chapter == 2 && x > 2600f  && x < 2850   && y > 850f    && y < 1100f   && z > 0f    && z < 100f)  return "manySplits_riftBlue_moon";
-        else if (chapter == 3 && x > -2800f && x < -2400f && y > -1800f  && y < -1450f  && z > 60f   && z < 120f)  return "manySplits_riftBlue_village";
-        else if (chapter == 3 && x > 1780f  && x < 2000f  && y > -11384f && y < -9350f  && z > 60f   && z < 120f)  return "manySplits_riftBlue_pipe";
-        else if (chapter == 4 && x > 7600f  && x < 7900f  && y > 1100f   && y < 1400f   && z > -500f && z < -100f) return "manySplits_riftBlue_twilight";
-        else if (chapter == 4 && x > 5700f  && x < 6000f  && y > 3100f   && y < 3400f   && z > -500f && z < -100f) return "manySplits_riftBlue_curly";
-        else if (chapter == 6 && x > 3700f  && x < 3950f  && y > 4300f   && y < 4550f   && z > 1200f && z < 1400f) return "manySplits_riftBlue_balcony";
-        else if (                x > -1180f && x < -920f  && y > 4050f   && y < 4350f   && z > 200f  && z < 300f)  return "manySplits_riftBlue_lab";
-        else if (                x >  7250f && x < 7550f  && y > 100f    && y < 400f    && z > -500f && z < -400f) return "manySplits_riftBlue_gallery";
+        // blue rifts
+        else if (chapter == 1 && x > -200f  && x < -150f  && y > -410f   && y < -360f   && z > 60f   && z < 120f  ||
+                                 x >  640f  && x <  780f  && y > 4000f   && y < 4140f   && z > 760f  && z < 960f)    return "manySplits_riftBlue_sewers";
+        else if (chapter == 1 && x > -200f  && x < -150f  && y > -150f   && y < -120f   && z > 60f   && z < 120f  || 
+                                 x > -3150f && x < -3030f && y > -2480f  && y < -2360f  && z > 400f  && z < 600f)    return "manySplits_riftBlue_bazaar";
+        else if (chapter == 2 && x > -2710f && x < -2500f && y > 1020f   && y < 1230f   && z > 10f   && z < 100f  ||
+                                 x > -53920f&& x < -53810f&& y > -9260f  && y < -9150f  && z > 100f  && z < 290f)    return "manySplits_riftBlue_owlExpress";
+        else if (chapter == 2 && x > 2600f  && x < 2850   && y > 850f    && y < 1100f   && z > 0f    && z < 100f  ||
+                                 x > -3950f && x < -3830f && y > -100f   && y < 0f      && z > 390f  && z < 570f)    return "manySplits_riftBlue_moon";
+        else if (chapter == 3 && x > -2800f && x < -2400f && y > -1800f  && y < -1450f  && z > 60f   && z < 120f  ||
+                                 x > 1190f  && x < 1290f  && y > 26250f  && y < 26350f  && z > 3450f && z < 3630f)   return "manySplits_riftBlue_village";
+        else if (chapter == 3 && x > 1780f  && x < 2000f  && y > -11384f && y < -9350f  && z > 60f   && z < 120f  ||
+                                 x > -130f  && x < -20f   && y > 7250f   && y < 7360f   && z > 500f  && z < 640f)    return "manySplits_riftBlue_pipe";
+        else if (chapter == 4 && x > 7600f  && x < 7900f  && y > 1100f   && y < 1400f   && z > -500f && z < -100f ||
+                                 x > 6330f  && x < 6450f  && y > 72060f  && y < 72180f  && z > 5150f && z < 5300f)   return "manySplits_riftBlue_twilight";
+        else if (chapter == 4 && x > 5700f  && x < 6000f  && y > 3100f   && y < 3400f   && z > -500f && z < -100f ||
+                                 x > 56380f && x < 56500f && y > 6740f   && y < 6840f   && z > -1690f&& z < -1500f)  return "manySplits_riftBlue_curly";
+        else if (chapter == 6 && x > 3700f  && x < 3950f  && y > 4300f   && y < 4550f   && z > 1200f && z < 1400f ||
+                                 x > -950f  && x < -840f  && y > -1410f  && y < -1310f  && z > 7690f && z < 7850f)   return "manySplits_riftBlue_balcony";
+        else if (                x > -1180f && x < -920f  && y > 4050f   && y < 4350f   && z > 200f  && z < 300f  ||
+                                 x > -3940f && x < -3840f && y > -80f    && y < 20f     && z > -520f && z < -350f)   return "manySplits_riftBlue_lab";
+        else if (                x >  7250f && x < 7550f  && y > 100f    && y < 400f    && z > -500f && z < -400f ||
+                                 x > 3100f  && x < 3220f  && y > -2400f  && y < -2270f &&  z > 130f  && z < 310f)    return "manySplits_riftBlue_gallery";
         else return "none";
     };
     vars.CurrentRiftCheck = CurrentRiftCheck;
@@ -445,7 +476,7 @@ update {
 }
 
 start {
-    return (settings["settings_newFileStart"] && vars.timerState.Current == 1 && vars.timerState.Old == 0 && vars.timePieceCount.Current == 0)
+    return (settings["settings_newFileStart"] && vars.timerState.Current == 1 && vars.timerState.Old == 0 && (vars.timePieceCount.Current == 0 || vars.timePieceCount.Current == -1))
         || (!settings["settings_newFileStart"] && vars.timerState.Current == 1 && vars.timerState.Old == 0)
         || (settings["settings_ILMode"] && vars.actTimerIsVisible.Current == 1 && vars.realActTime.Current == 0);
 }
@@ -463,11 +494,17 @@ split {
                 ||
                 vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && settings["splits_tp_any"]  // any time piece
                 ||
-                vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && version != "Undetected" && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"]  // seal the deal time piece
+                vars.actTimerIsVisible.Current == 1 && vars.actTimerIsVisible.Old == 0 && settings["splits_actEntry"] && !settings["settings_ILMode"] // act entry or spaceship rift entry
                 ||
-                vars.gameTimerIsPaused.Old == 1 && vars.gameTimerIsPaused.Current == 0 && (vars.realActTime.Old == 0f || vars.realActTime.Old > vars.realActTime.Current) && settings["splits_actEntry"] && !settings["settings_ILMode"] // act entry or spaceship rift entry
-                ||
-                version != "Undetected" && current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"]  // death wish back to hub
+                version != "Undetected" 
+                &&
+                    (
+                    vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0  && current.chapter == 3 && vars.lastChapter == 5 && settings["splits_tp_std"]  // seal the deal time piece
+                    ||
+                    current.chapter == 97 && old.chapter != 97 && settings["splits_dwbth"] && (settings["splits_dwbth_doubleSplitNo"] && vars.splitsLock.ElapsedMilliseconds > 9000 || !settings["splits_dwbth_doubleSplitNo"])  // death wish back to hub
+                    ||
+                    current.yarn == old.yarn + 1 && settings["splits_yarn"] // yarn
+                    )
                 )
             ||
             settings["manySplits"] && version != "Undetected" && vars.currentRift == "none"
@@ -481,7 +518,7 @@ split {
                 ||
                 vars.splitInLoadScreen && vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0  // delayed custom time pieces
                 ||
-                vars.gameTimerIsPaused.Old == 1 && vars.gameTimerIsPaused.Current == 0 && (vars.realActTime.Old == 0f || vars.realActTime.Old > vars.realActTime.Current) && !settings["settings_ILMode"] && (settings["manySplits_" + current.chapter + "_" + current.act + "_entry"] || settings["manySplits_" + current.chapter + "_entry"]) // custom act entry
+                vars.actTimerIsVisible.Current == 1 && vars.actTimerIsVisible.Old == 0 && !settings["settings_ILMode"] && (settings["manySplits_" + current.chapter + "_" + current.act + "_entry"] || settings["manySplits_" + current.chapter + "_entry"]) // custom act entry
                 ||
                 vars.gameTimerIsPaused.Current == 1 && vars.gameTimerIsPaused.Old == 0 && settings["manySplits_" + current.chapter + "_" + current.act + "_cp" + current.checkpoint + "_pause"] // paused with certain checkpoint
                 ||
@@ -502,8 +539,7 @@ split {
 
 reset {
     return (vars.timerState.Current == 0 && vars.timerState.Old == 1 
-        || settings["settings_ILMode"] && (vars.actTimerIsVisible.Current == 0 && vars.actTimerIsVisible.Old == 1 || vars.realActTime.Current < vars.realActTime.Old && vars.realActTime.Current == 0f))
-        && !(vars.timePieceCount.Old == 0 && settings["settings_noResetIntro"] && version != "Undetected" && current.x > -2300f && current.x < -2000f && current.y > -2000f && current.y < -1750f);
+        || settings["settings_ILMode"] && (vars.actTimerIsVisible.Current == 0 && vars.actTimerIsVisible.Old == 1 || vars.realActTime.Current < vars.realActTime.Old && vars.realActTime.Current == 0f));
 }
 
 isLoading {
