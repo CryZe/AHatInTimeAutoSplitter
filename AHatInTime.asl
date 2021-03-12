@@ -35,7 +35,7 @@ startup {
         "48 8B 05 ?? ?? ?? ?? 48 8B 7C 24 ?? 48 83 C4 40"
     );
 
-    // physics, for all patches
+    // actors, for all patches
     vars.actorsScanTarget = new SigScanTarget(3,
         "48 8B 05 ?? ?? ?? ?? 81 88 ?? ?? ?? ?? 00 00 80 00"
     );
@@ -271,7 +271,7 @@ init {
             }
         }
 
-        // physics scan
+        // actors scan
         foreach (var page in game.MemoryPages(true).Reverse()) {
             var scanner = new SignatureScanner(game, page.BaseAddress, (int)page.RegionSize);
 
@@ -281,7 +281,7 @@ init {
             }
         }
 
-        // physics second to last offset scan
+        // hatkid offset scan
         foreach (var page in game.MemoryPages(true).Reverse()) {
             var scanner = new SignatureScanner(game, page.BaseAddress, (int)page.RegionSize);
 
@@ -362,7 +362,7 @@ init {
 
         // this makes sure that the variable is initialized
         while (memory.ReadValue<int>(actorsAddressFinal) == 0){
-            Thread.Sleep(500);
+            Thread.Sleep(1000);
         }
 
         // x y z coordinates memory watchers for all patches
@@ -438,7 +438,7 @@ init {
     posSplitKeysDict.Add (4, posVolumeKeysChFour);
 
     List<List<float>> posVolumeKeysChFive = new List<List<float>>();
-    posVolumeKeysChFive.Add (new List<float>() {-30000f, -28000f, -2f, -2f, -2f, -2f, 5f}); // slap (around to the final pillars)
+    posVolumeKeysChFive.Add (new List<float>() {-30000f, -28000f, -2f, -2f, -2f, -2f, 5f}); // slap (around the final pillars)
     posSplitKeysDict.Add (5, posVolumeKeysChFive);
 
     vars.posSplitKeysDict = posSplitKeysDict;
@@ -454,7 +454,7 @@ init {
     posSplitsDict.Add(5f,  new float[6] {-38300f,  -38190f, -85000f,  -84000f,  -2f,    -2f});      // slap (5-1)
     vars.posSplitsDict = posSplitsDict;
 
-    // position splits, note that these are only checked when their "volume key" is found in vars.poSplitKey
+    // position splits, note that these are only checked when their "volume key" is found in vars.posSplitKeyDict
     Func <float, float, float, float[], bool> ShouldSplitAtThisPos = (float x, float y, float z, float[] position) => {
         return ((x > position[0] || position[0] == -2f) && (x < position[1] || position[1] == -2f) && 
                 (y > position[2] || position[2] == -2f) && (y < position[3] || position[3] == -2f) && 
