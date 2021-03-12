@@ -1,6 +1,3 @@
-// TODO: use a saved game time value + act time when getting time pieces to always have perfect time piece timings
-//       remove prints please
-
 state("HatinTimeGame") {
 }
 
@@ -39,12 +36,12 @@ startup {
     );
 
     // physics, for all patches
-    vars.physicsScanTarget = new SigScanTarget(3,
+    vars.actorsScanTarget = new SigScanTarget(3,
         "48 8B 05 ?? ?? ?? ?? 81 88 ?? ?? ?? ?? 00 00 80 00"
     );
 
     // this finds the second to last offset for the coordinates of hat kid
-    vars.coordinatesOffsetScanTarget = new SigScanTarget(3,
+    vars.hatKidScanTarget = new SigScanTarget(3,
         "48 8B 81 ?? ?? ?? ?? 4C 8D 80 ?? ?? ?? ??"
     );
 
@@ -66,7 +63,7 @@ startup {
     settings.Add("splits_tp_std", true, "Seal The Deal", "splits_tp");
     settings.SetToolTip("splits_tp_std", "End of Death Wish Any%.");
     settings.Add("splits_actEntry", false, "Act Entries");
-    settings.SetToolTip("splits_actEntry", "Also for Time Rifts in the spaceship.");
+    settings.SetToolTip("splits_actEntry", "Also for time rifts in the spaceship.");
     settings.Add("splits_dwbth", false, "Death Wish Level Back to Hub");
     settings.Add("splits_dwbth_doubleSplitNo", true, "Avoid Double Splits", "splits_dwbth");
     settings.SetToolTip("splits_dwbth_doubleSplitNo", "Useful for 110%,\nIf another split triggered recently, the Death Wish Back to Hub split won't trigger.");
@@ -93,6 +90,9 @@ startup {
             if (j <= 4 && actNames[j-1, i-1] != ""){
                 settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i, true, actNames[j-1, i-1], "manySplits_" + (j == 4 ? 6 : j));
                 settings.Add("manySplits_" + (j == 4 ? 6 : j) + "_" + i + "_entry", false, "Entry", "manySplits_" + (j == 4 ? 6 : j) + "_" + i);
+                if (i == 1){
+                    settings.SetToolTip("manySplits_" + (j == 4 ? 6 : j) + "_1_entry", "Note that this also triggers when entering a time rift from this chapter using the telescope.");
+                }
             }
             else {
                 i = 8;
@@ -110,7 +110,7 @@ startup {
     settings.Add("manySplits_1_4_cp1", false, "Vent", "manySplits_1_4");
     settings.Add("manySplits_1_4_cp2", false, "Boss", "manySplits_1_4");
     settings.Add("manySplits_1_6_cp59_pause", false, "Death", "manySplits_1_6");
-    settings.SetToolTip("manySplits_1_6_cp59_pause", "Make sure you are doing on of the ice hat routes for this to work.");
+    settings.SetToolTip("manySplits_1_6_cp59_pause", "Only for routes that do the beach faucet after the death as the last one.");
 
     settings.Add("manySplits_2_1_cp5", false, "Warp Exploit", "manySplits_2_1");
     settings.Add("manySplits_2_4_cp1", false, "Intro", "manySplits_2_4");
@@ -203,13 +203,14 @@ startup {
     #endregion
 
     vars.lastChapter = 0; // used by seal the deal split
+    vars.gameTimeFinal = 0.0; // game time used in gameTime{}
+    vars.savedGameTime = 0.0; // used to save the game time at the start of each act
     vars.splitInLoadScreen = false;
     vars.currentRift = "none"; // indicates the current time rift, none -> not in a rift
     vars.justEnteredRift = false;
     vars.posSplitKey = 0f; // key for a position split to trigger, 0f -> no key currently in use
     vars.splitsLock = new Stopwatch(); // prevents double splits
     vars.splitsLock.Start();
-    vars.saveDataPtrAttempts = 0; // # of attempts to find the save data pointer
 
     vars.splitActions = (EventHandler)((s, e) => {
         vars.splitsLock.Restart();
@@ -219,6 +220,180 @@ startup {
 }
 
 init {
+
+    // signature scan thread
+    vars.threadScan = new Thread(() => {
+
+        var ptr = IntPtr.Zero;
+        var saveDataPtrAddress = IntPtr.Zero;
+        var actorsPrtAddress = IntPtr.Zero;
+        var coordsOffsetPrtAddress = IntPtr.Zero;
+
+        foreach (var page in game.MemoryPages(true).Reverse()) {
+            // if (page.State == MemPageState.MEM_COMMIT &&
+            //     page.Type == MemPageType.MEM_IMAGE &&
+            //     page.Protect == MemPageProtect.PAGE_READWRITE
+            // ) {
+                var scanner = new SignatureScanner(game, page.BaseAddress, (int)page.RegionSize);
+
+                if (ptr == IntPtr.Zero) {
+                    ptr = scanner.Scan(vars.scanTarget);
+                } else {
+                    break;
+                }
+            // }
+        }
+
+        // save data scan
+        vars.saveDataPtrType = "none";
+        foreach (var page in game.MemoryPages(true).Reverse()) {
+            var scanner = new SignatureScanner(game, page.BaseAddress, (int)page.RegionSize);
+
+            // scan for DLC patches
+            saveDataPtrAddress = scanner.Scan(vars.saveDataScanTargetDLC);
+            if (saveDataPtrAddress != IntPtr.Zero) {
+                vars.saveDataPtrType = "DLCPtr";
+                break;
+            }
+
+            // scan for pre DLC modding patches
+            saveDataPtrAddress = scanner.Scan(vars.saveDataScanTargetModding);
+            if (saveDataPtrAddress != IntPtr.Zero) {
+                vars.saveDataPtrType = "ModdingPtr";
+                break;
+            }
+
+            // scan for 1.0 and similar
+            saveDataPtrAddress = scanner.Scan(vars.saveDataScanTargetoRelease);
+            if (saveDataPtrAddress != IntPtr.Zero) {
+                vars.saveDataPtrType = "1.0Ptr";
+                break;
+            }
+        }
+
+        // physics scan
+        foreach (var page in game.MemoryPages(true).Reverse()) {
+            var scanner = new SignatureScanner(game, page.BaseAddress, (int)page.RegionSize);
+
+            actorsPrtAddress = scanner.Scan(vars.actorsScanTarget);
+            if (actorsPrtAddress != IntPtr.Zero) {
+                break;
+            }
+        }
+
+        // physics second to last offset scan
+        foreach (var page in game.MemoryPages(true).Reverse()) {
+            var scanner = new SignatureScanner(game, page.BaseAddress, (int)page.RegionSize);
+
+            coordsOffsetPrtAddress = scanner.Scan(vars.hatKidScanTarget);
+            if (coordsOffsetPrtAddress != IntPtr.Zero) {
+                break;
+            }
+        }
+
+
+        if (ptr == IntPtr.Zero) {
+            // Waiting for the game to have booted up. This is a pretty ugly work
+            // around, but we don't really know when the game is booted or where the
+            // struct will be, so to reduce the amount of searching we are doing, we
+            // sleep a bit between every attempt.
+            Thread.Sleep(1000);
+            throw new Exception();
+        }
+
+        vars.timerState = new MemoryWatcher<int>(ptr + 0x04);
+        vars.unpauseTime = new MemoryWatcher<double>(ptr + 0x08);
+        vars.gameTimerIsPaused = new MemoryWatcher<int>(ptr + 0x10);
+        vars.actTimerIsPaused = new MemoryWatcher<int>(ptr + 0x14);
+        vars.actTimerIsVisible = new MemoryWatcher<int>(ptr + 0x18);
+        vars.unpauseTimeIsDirty = new MemoryWatcher<int>(ptr + 0x1C);
+        vars.justGotTimePiece = new MemoryWatcher<int>(ptr + 0x20);
+        vars.gameTime = new MemoryWatcher<double>(ptr + 0x24);
+        vars.actTime = new MemoryWatcher<double>(ptr + 0x2C);
+        vars.realGameTime = new MemoryWatcher<double>(ptr + 0x34);
+        vars.realActTime = new MemoryWatcher<double>(ptr + 0x3C);
+        vars.timePieceCount = new MemoryWatcher<int>(ptr + 0x44);
+
+
+        // first the data at this address is read, it's an offset for the same address, used to jump to the save data address, which means...
+        var saveDataPtrAddressOffset = memory.ReadValue<int>(saveDataPtrAddress);
+
+        // by adding the previous address with the prevoiusly read offset and adding a manual offset of 4, we get to the address of the save data poiter
+        var saveDataAddressFinal = (IntPtr)((long)saveDataPtrAddress + (long)saveDataPtrAddressOffset + (long)4);
+
+        // this makes sure that the variable is initialized
+        while (memory.ReadValue<int>(saveDataAddressFinal) == 0){
+            Thread.Sleep(1000);
+        }
+
+        // here are the final memory watchers that are created using the pointer at the address that was just calculated
+        // offsets for DLC patches
+        if (vars.saveDataPtrType == "DLCPtr"){
+            vars.yarn = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x68, 0xF0));
+            vars.chapter = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x68, 0x108));
+            vars.act = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x68, 0x10C));
+            vars.checkpoint = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x68, 0x110));
+        }
+        // offsets for modding patch and similar
+        else if (vars.saveDataPtrType == "ModdingPtr"){
+            vars.yarn = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0xE0));
+            vars.chapter = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0xF8));
+            vars.act = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0xFC));
+            vars.checkpoint = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0x100));
+        }
+        // offsets for 1.0 and similar and patches that don't find any signature (these should constantly return 0)
+        else{
+            vars.yarn = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0xE0));
+            vars.chapter = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0xF4));
+            vars.act = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0xF8));
+            vars.checkpoint = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0xFC));
+        }
+
+
+        // first the data at this address is read, it's an offset for the same address, used to jump to the save data address, which means...
+        // not sure if this is exactly for actors but I need to put a name...
+        var actorsPtrAddressOffset = memory.ReadValue<int>(actorsPrtAddress);
+
+        // by adding the previous address with the prevoiusly read offset and adding a manual offset of 4, we get to the address of the save data poiter
+        var actorsAddressFinal = (IntPtr)((long)actorsPrtAddress + (long)actorsPtrAddressOffset + (long)4);
+
+        // here is where the second to last offset that's different in some patches is read 
+        var hatKidOffset = memory.ReadValue<int>(coordsOffsetPrtAddress);
+
+        // this makes sure that the variable is initialized
+        while (memory.ReadValue<int>(actorsAddressFinal) == 0){
+            Thread.Sleep(500);
+        }
+
+        // x y z coordinates memory watchers for all patches
+        vars.x = new MemoryWatcher<float>(new DeepPointer(actorsAddressFinal, 0x6DC, 0x00, 0x68, hatKidOffset, 0x80));
+        vars.y = new MemoryWatcher<float>(new DeepPointer(actorsAddressFinal, 0x6DC, 0x00, 0x68, hatKidOffset, 0x84));
+        vars.z = new MemoryWatcher<float>(new DeepPointer(actorsAddressFinal, 0x6DC, 0x00, 0x68, hatKidOffset, 0x88));
+
+
+        vars.watchers = new MemoryWatcherList() {
+            vars.timerState,
+            vars.unpauseTime,
+            vars.gameTimerIsPaused,
+            vars.actTimerIsPaused,
+            vars.actTimerIsVisible,
+            vars.unpauseTimeIsDirty,
+            vars.justGotTimePiece,
+            vars.gameTime,
+            vars.actTime,
+            vars.realGameTime,
+            vars.realActTime,
+            vars.timePieceCount,
+            vars.yarn,
+            vars.chapter,
+            vars.act,
+            vars.checkpoint,
+            vars.x,
+            vars.y,
+            vars.z
+        };
+    });
+    vars.threadScan.Start();
 
     if (timer.CurrentTimingMethod == TimingMethod.RealTime && settings["settings_gameTimeMsg"]){
         var message = MessageBox.Show(
@@ -230,201 +405,21 @@ init {
         }
     }
 
-    switch (modules.First().ModuleMemorySize) {
-        case 0x13AF000: version = "DLC 2.1"; break;
-        case 0x13F0000: version = "110% Patch"; break;
-        case 0x13ED000: version = "TAS Patch"; break;
-        case 0x13B3000: version = "DLC 1.5"; break;
-        case 0x1260000: version = "Modding"; break;
-        case 0x12AD000: version = "1.0"; break;
-        default: version = "Undetected"; break;
+    // MD5 code by CptBrian.
+    string MD5Hash;
+    using (var md5 = System.Security.Cryptography.MD5.Create())
+        using (var s = File.Open(modules.First().FileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            MD5Hash = md5.ComputeHash(s).Select(x => x.ToString("X2")).Aggregate((a, b) => a + b);
+
+    switch (MD5Hash){
+        case "D9898AF61F812A94D459A2949F6C44CB": version = "DLC 2.1"; break;
+        case "1146D9624167F5B27316EA3186CE38BC": version = "110% Patch"; break;
+        case "1A7ECB949C9E7AA43C30A8130E4BBFC7": version = "TAS Patch"; break;
+        case "7E3BC291F73AFF33697D614E058F55FA": version = "DLC 1.5"; break;
+        case "86BE2DADA5A75B451A413644245A2C36": version = "Modding"; break;
+        case "ABF94326BBA029207F6537AA8EF21C0E": version = "1.0"; break;
+        default: version = "Unknown"; break;
     }
-
-    var ptr = IntPtr.Zero;
-    var saveDataPtrAddress = IntPtr.Zero;
-    var physicsPrtAddress = IntPtr.Zero;
-    var coordsOffsetPrtAddress = IntPtr.Zero;
-
-    foreach (var page in game.MemoryPages(true).Reverse()) {
-        // if (page.State == MemPageState.MEM_COMMIT &&
-        //     page.Type == MemPageType.MEM_IMAGE &&
-        //     page.Protect == MemPageProtect.PAGE_READWRITE
-        // ) {
-            var scanner = new SignatureScanner(game, page.BaseAddress, (int)page.RegionSize);
-
-            if (ptr == IntPtr.Zero) {
-                ptr = scanner.Scan(vars.scanTarget);
-            } else {
-                break;
-            }
-        // }
-    }
-    print("TIMR ADDRESS FOUND: " + ptr.ToString("X"));
-
-    // save data scan
-    vars.saveDataPtrType = "none";
-    foreach (var page in game.MemoryPages(true).Reverse()) {
-        var scanner = new SignatureScanner(game, page.BaseAddress, (int)page.RegionSize);
-
-        // scan for DLC patches
-        saveDataPtrAddress = scanner.Scan(vars.saveDataScanTargetDLC);
-        if (saveDataPtrAddress != IntPtr.Zero) {
-            vars.saveDataPtrType = "DLCPtr";
-            break;
-        }
-
-        // scan for pre DLC patches
-        saveDataPtrAddress = scanner.Scan(vars.saveDataScanTargetModding);
-        if (saveDataPtrAddress != IntPtr.Zero) {
-            vars.saveDataPtrType = "ModdingPtr";
-            break;
-        }
-
-        // scan for 1.0
-        saveDataPtrAddress = scanner.Scan(vars.saveDataScanTargetoRelease);
-        if (saveDataPtrAddress != IntPtr.Zero) {
-            vars.saveDataPtrType = "1.0Ptr";
-            break;
-        }
-    }
-    print("SAVE DATA ADDRESS POINTER: " + saveDataPtrAddress.ToString("X"));
-
-    // physics scan
-    foreach (var page in game.MemoryPages(true).Reverse()) {
-        var scanner = new SignatureScanner(game, page.BaseAddress, (int)page.RegionSize);
-
-        physicsPrtAddress = scanner.Scan(vars.physicsScanTarget);
-        if (physicsPrtAddress != IntPtr.Zero) {
-            break;
-        }
-    }
-    print("PHYSICS ADDRESS POINTER: " + physicsPrtAddress.ToString("X"));
-
-    // physics second to last offset scan
-    foreach (var page in game.MemoryPages(true).Reverse()) {
-        var scanner = new SignatureScanner(game, page.BaseAddress, (int)page.RegionSize);
-
-        coordsOffsetPrtAddress = scanner.Scan(vars.coordinatesOffsetScanTarget);
-        if (coordsOffsetPrtAddress != IntPtr.Zero) {
-            break;
-        }
-    }
-
-
-    if (ptr == IntPtr.Zero || (saveDataPtrAddress == IntPtr.Zero && vars.saveDataPtrAttempts < 15) ) {
-        // Waiting for the game to have booted up. This is a pretty ugly work
-        // around, but we don't really know when the game is booted or where the
-        // struct will be, so to reduce the amount of searching we are doing, we
-        // sleep a bit between every attempt.
-        Thread.Sleep(1000);
-        // arbitrary number of retries to find this pointer, without this, the save data signature would be searched endlessly in a patch that's not supported
-        vars.saveDataPtrAttempts += 1;
-        throw new Exception();
-    }
-
-    vars.timerState = new MemoryWatcher<int>(ptr + 0x04);
-    vars.unpauseTime = new MemoryWatcher<double>(ptr + 0x08);
-    vars.gameTimerIsPaused = new MemoryWatcher<int>(ptr + 0x10);
-    vars.actTimerIsPaused = new MemoryWatcher<int>(ptr + 0x14);
-    vars.actTimerIsVisible = new MemoryWatcher<int>(ptr + 0x18);
-    vars.unpauseTimeIsDirty = new MemoryWatcher<int>(ptr + 0x1C);
-    vars.justGotTimePiece = new MemoryWatcher<int>(ptr + 0x20);
-    vars.gameTime = new MemoryWatcher<double>(ptr + 0x24);
-    vars.actTime = new MemoryWatcher<double>(ptr + 0x2C);
-    vars.realGameTime = new MemoryWatcher<double>(ptr + 0x34);
-    vars.realActTime = new MemoryWatcher<double>(ptr + 0x3C);
-    vars.timePieceCount = new MemoryWatcher<int>(ptr + 0x44);
-
-
-    // first the data at this address is read, it's an offset for the same address, used to jump to the save data address, which means...
-    var saveDataPtrAddressOffset = new DeepPointer((IntPtr)saveDataPtrAddress).Deref<int>(game, -1);
-    print(">>>>>>>>>Savedata pointer: " + saveDataPtrAddressOffset.ToString("X"));
-
-    // by adding the previous address with the prevoiusly read offset and adding a manual offset of 4, we get to the address of the save data poiter
-    var saveDataAddressFinal = (IntPtr)((long)saveDataPtrAddress + (long)saveDataPtrAddressOffset + (long)4);
-    print (">>>>>>>>>>>>>Final Address save data: " + saveDataAddressFinal.ToString("X") + "   ---   Save Pointer Type: " + vars.saveDataPtrType);
-
-    // here are the final memory watchers that are created using the pointer at the address that was just calculated
-    // offsets for 1.0 and similar
-    if (vars.saveDataPtrType == "1.0Ptr"){
-        vars.yarn = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0xE0));
-        vars.chapter = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0xF4));
-        vars.act = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0xF8));
-        vars.checkpoint = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0xFC));
-    }
-    // offsets for modding patch and similar
-    else if (vars.saveDataPtrType == "ModdingPtr"){
-        vars.yarn = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0xE0));
-        vars.chapter = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0xF8));
-        vars.act = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0xFC));
-        vars.checkpoint = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x64, 0x100));
-    }
-    // offsets for DLC patches and patches that don't find any signature (these should constantly return 0)
-    else{
-        vars.yarn = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x68, 0xF0));
-        vars.chapter = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x68, 0x108));
-        vars.act = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x68, 0x10C));
-        vars.checkpoint = new MemoryWatcher<int>(new DeepPointer(saveDataAddressFinal, 0x68, 0x110));
-    }
-
-
-
-    // first the data at this address is read, it's an offset for the same address, used to jump to the save data address, which means...
-    var physicsPtrAddressOffset = new DeepPointer((IntPtr)physicsPrtAddress).Deref<int>(game, -1);
-    print(">>>>>>>>>Physics pointer: " + physicsPtrAddressOffset.ToString("X"));
-
-    // by adding the previous address with the prevoiusly read offset and adding a manual offset of 4, we get to the address of the save data poiter
-    var physicsAddressFinal = (IntPtr)((long)physicsPrtAddress + (long)physicsPtrAddressOffset + (long)4);
-    print (">>>>>>>>>>>>>Final Address Physics: " + physicsAddressFinal.ToString("X"));
-
-
-    // here is where the second to last offset that's different in some patches is read 
-    var physicsOffset = new DeepPointer((IntPtr)coordsOffsetPrtAddress).Deref<int>(game, -1);
-    print(">>>>>>Offset: " + physicsOffset.ToString("X"));
-
-    // x y z coordinates memory watchers for all patches
-    vars.x = new MemoryWatcher<float>(new DeepPointer(physicsAddressFinal, 0x6DC, 0x00, 0x68, physicsOffset, 0x80));
-    vars.y = new MemoryWatcher<float>(new DeepPointer(physicsAddressFinal, 0x6DC, 0x00, 0x68, physicsOffset, 0x84));
-    vars.z = new MemoryWatcher<float>(new DeepPointer(physicsAddressFinal, 0x6DC, 0x00, 0x68, physicsOffset, 0x88));
-
-
-
-    vars.maxFps = new MemoryWatcher<float>(new DeepPointer(physicsAddressFinal, 0x710));
-    vars.maxFps.Update(game);
-    print ("MAX FPS: " + vars.maxFps.Current.ToString());
-
-
-
-    vars.watchers = new MemoryWatcherList() {
-        vars.timerState,
-        vars.unpauseTime,
-        vars.gameTimerIsPaused,
-        vars.actTimerIsPaused,
-        vars.actTimerIsVisible,
-        vars.unpauseTimeIsDirty,
-        vars.justGotTimePiece,
-        vars.gameTime,
-        vars.actTime,
-        vars.realGameTime,
-        vars.realActTime,
-        vars.timePieceCount,
-        vars.yarn,
-        vars.chapter,
-        vars.act,
-        vars.checkpoint,
-        vars.x,
-        vars.y,
-        vars.z,
-        vars.maxFps // DELETE
-    };
-
-    vars.watchers.UpdateAll(game);
-    print(">>>>>>>>>yarn: " + vars.yarn.Current);
-    print(">>>>>>>>>chapter: " + vars.chapter.Current);
-    print(">>>>>>>>>act: " + vars.act.Current);
-    print(">>>>>>>>>checkpoint: " + vars.checkpoint.Current);
-
-
 
     // volume "keys" dictionary that enables the volume split triggers
     // the main idea is making a volume trigger a split only when hat kid has gone through a certain other volume right before
@@ -517,8 +512,8 @@ init {
                                  x > -950f  && x < -840f  && y > -1410f  && y < -1310f  && z > 7690f && z < 7850f)   return "manySplits_riftBlue_balcony";
         else if (                x > -1180f && x < -920f  && y > 4050f   && y < 4350f   && z > 200f  && z < 300f  ||
                                  x > -3940f && x < -3840f && y > -80f    && y < 20f     && z > -520f && z < -350f)   return "manySplits_riftBlue_lab";
-        else if (                x >  7250f && x < 7550f  && y > 100f    && y < 400f    && z > -500f && z < -400f ||
-                                 x > 3100f  && x < 3220f  && y > -2400f  && y < -2270f &&  z > 130f  && z < 310f)    return "manySplits_riftBlue_gallery";
+        else if (                x > 7250f  && x < 7550f  && y > 100f    && y < 400f    && z > -500f && z < -400f ||
+                                 x > 3100f  && x < 3220f  && y > -2400f  && y < -2270f  && z > 130f  && z < 310f)    return "manySplits_riftBlue_gallery";
         else return "none";
     };
     vars.CurrentRiftCheck = CurrentRiftCheck;
@@ -539,61 +534,37 @@ init {
     };
     vars.BackToHubCheck = BackToHubCheck;
 
-
-
-
-
-
-    // updates a text component in the layout, also creates it if it doesn't exist
-	Action <string, string> UpdateTextComponent = (string name, string updatedText) => {
-		bool foundComponent = false;
-		foreach (dynamic component in timer.Layout.Components){
-			if (component.GetType().Name != "TextComponent" || component.Settings.Text1 != name) continue;
-			component.Settings.Text2 = updatedText;
-			foundComponent = true;
-			break;
-		}
-		if (!foundComponent) vars.CreateTextComponent(name, updatedText);
-	};
-	vars.UpdateTextComponent = UpdateTextComponent;
-	
-	// creates a text component, used when UpdateTextComponent doens't find the text component requested
-	Action <string, string> CreateTextComponent = (string textLeft, string textRight) => {
-		var textComponentAssembly = Assembly.LoadFrom("Components\\LiveSplit.Text.dll");
-		dynamic textComponent = Activator.CreateInstance(textComponentAssembly.GetType("LiveSplit.UI.Components.TextComponent"), timer);
-		timer.Layout.LayoutComponents.Add(new LiveSplit.UI.Components.LayoutComponent("LiveSplit.Text.dll", textComponent as LiveSplit.UI.Components.IComponent));
-		textComponent.Settings.Text1 = textLeft;
-		textComponent.Settings.Text2 = textRight;
-	};
-	vars.CreateTextComponent = CreateTextComponent;
-
 }
 
 update {
+    if(vars.threadScan.IsAlive){
+        return false;
+    }
+
     vars.watchers.UpdateAll(game);
-
-    if (vars.chapter.Changed || vars.act.Changed || vars.checkpoint.Changed || vars.yarn.Changed){
-        vars.UpdateTextComponent("Chapter", vars.chapter.Current.ToString());
-        vars.UpdateTextComponent("Act", vars.act.Current.ToString());
-        vars.UpdateTextComponent("Checkpoint", vars.checkpoint.Current.ToString());
-        vars.UpdateTextComponent("Yarn", vars.yarn.Current.ToString());
-    }
-    if (vars.x.Changed || vars.y.Changed || vars.z.Changed){
-        vars.UpdateTextComponent("X", vars.x.Current.ToString());
-        vars.UpdateTextComponent("Y", vars.y.Current.ToString());
-        vars.UpdateTextComponent("Z", vars.z.Current.ToString());
-    }
-    if (vars.maxFps.Changed){
-        print (">>MAX FPS: " + vars.maxFps.Current);
-    }
-
 
     if (vars.chapter.Current != vars.chapter.Old){
         vars.lastChapter = vars.chapter.Old;
     }
-    // delayed time piece split activation
-    if ((vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0) && settings["manySplits_" + vars.chapter.Current + "_" + vars.act.Current + "_tpDelayed"]){
-        vars.splitInLoadScreen = true;
+
+    // game time is saved here to change it easily in the update{} block
+    vars.gameTimeFinal = vars.realGameTime.Current;
+
+    // when an act starts the game time is saved to calculate the split time when grabbing a time piece with more precision
+    if (vars.actTimerIsVisible.Current == 1 && vars.actTimerIsVisible.Old == 0){
+        vars.savedGameTime = vars.gameTime.Current;
+    }
+
+    // delayed time piece split activation and game time adjustment when getting a time piece
+    if (vars.timePieceCount.Current == vars.timePieceCount.Old + 1 || vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0){
+        // delayed time piece split activation
+        if (settings["manySplits_" + vars.chapter.Current + "_" + vars.act.Current + "_tpDelayed"]){
+            vars.splitInLoadScreen = true;
+        }
+        // game time adjustment for a more accurate timing, this condition makes sure that the time to replace isn't completely off
+        if (vars.savedGameTime + vars.realActTime.Current > vars.realGameTime.Current - 0.1 && vars.savedGameTime + vars.realActTime.Current < vars.realGameTime.Current + 0.1){
+            vars.gameTimeFinal = vars.savedGameTime + vars.realActTime.Current;
+        }
     }
     // actions taken when timer unpauses
     if (vars.gameTimerIsPaused.Current == 0 && vars.gameTimerIsPaused.Old == 1){
@@ -615,7 +586,7 @@ update {
             vars.justEnteredRift = true;
         }
     }
-    // position split key detection
+    // position split key detection, note that only chapters 4 and 5 have this kind of split so this is ignored for other chapters
     if (vars.chapter.Current == 4 || vars.chapter.Current == 5){
         foreach (var position in vars.posSplitKeysDict[vars.chapter.Current]){ 
             if ((vars.x.Current > position[0] || position[0] == -2f) && (vars.x.Current < position[1] || position[1] == -2f) && 
@@ -645,9 +616,9 @@ split {
                 (
                 vars.timePieceCount.Current == vars.timePieceCount.Old + 1 && settings["splits_tp_new"]  // new time piece
                 ||
-                vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && settings["splits_tp_any"]  // any time piece
+                vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0 && settings["splits_tp_any"] // any time piece
                 ||
-                vars.actTimerIsVisible.Current == 1 && vars.actTimerIsVisible.Old == 0 && settings["splits_actEntry"] && !settings["settings_ILMode"] // act entry or spaceship rift entry
+                vars.actTimerIsVisible.Current == 1 && vars.actTimerIsVisible.Old == 0 && vars.currentRift == "none" && settings["splits_actEntry"] && !settings["settings_ILMode"] // act entry
                 ||
                 vars.justGotTimePiece.Current == 1 && vars.justGotTimePiece.Old == 0  && vars.chapter.Current == 3 && vars.lastChapter == 5 && settings["splits_tp_std"]  // seal the deal time piece
                 ||
@@ -681,7 +652,7 @@ split {
                 ||
                 vars.checkpoint.Current > vars.checkpoint.Old && settings[vars.currentRift + "_cp"] // new purple rift checkpoint
                 ||
-                vars.justEnteredRift && settings[vars.currentRift + "_entry"] && !settings["settings_ILMode"] // rift entry
+                vars.justEnteredRift && settings[vars.currentRift + "_entry"] && !settings["settings_ILMode"] && vars.splitsLock.ElapsedMilliseconds > 3000 // rift entry
                 )
             );
 }
@@ -696,11 +667,7 @@ isLoading {
 }
 
 gameTime {
-    return settings["settings_ILMode"] ? TimeSpan.FromSeconds(vars.realActTime.Current) : TimeSpan.FromSeconds(vars.realGameTime.Current);
-}
-
-exit {
-    vars.saveDataPtrAttempts = 0;
+    return settings["settings_ILMode"] ? TimeSpan.FromSeconds(vars.realActTime.Current) : TimeSpan.FromSeconds(vars.gameTimeFinal);
 }
 
 shutdown {
