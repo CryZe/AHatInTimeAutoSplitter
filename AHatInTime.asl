@@ -20,6 +20,11 @@ startup {
         "45 4E 44 20" // END
     );
 
+    // works on vanessa's curse patches from 2022/01/12+
+    vars.saveDataScanTargetVacu = new SigScanTarget(3,
+        "48 8B 1D ?? ?? ?? ?? 48 85 DB 74 ?? 48 8B 5B ?? 48 85 DB 74 ??"
+    );
+
     // works on DLC patches
     vars.saveDataScanTargetDLC = new SigScanTarget(3,
         "48 8B 05 ?? ?? ?? ?? 48 8B 74 24 ?? 48 83 C4 50"
@@ -64,10 +69,11 @@ startup {
     settings.SetToolTip("splits_tp_std", "End of Death Wish Any%.");
     settings.Add("splits_actEntry", false, "Act Entries");
     settings.SetToolTip("splits_actEntry", "Also for time rifts in the spaceship.");
+    settings.Add("splits_checkpoint", false, "Checkpoint");
+    settings.Add("splits_yarn", false, "Yarn");
     settings.Add("splits_dwbth", false, "Death Wish Level Back to Hub");
     settings.Add("splits_dwbth_doubleSplitNo", true, "Avoid Double Splits", "splits_dwbth");
     settings.SetToolTip("splits_dwbth_doubleSplitNo", "Useful for 110%,\nIf another split triggered recently, the Death Wish Back to Hub split won't trigger.");
-    settings.Add("splits_yarn", false, "Yarn");
     settings.CurrentDefaultParent = null;
 
     settings.Add("manySplits", false, "Detailed Splits");
@@ -248,6 +254,13 @@ init {
         vars.saveDataPtrType = "none";
         foreach (var page in game.MemoryPages(true).Reverse()) {
             var scanner = new SignatureScanner(game, page.BaseAddress, (int)page.RegionSize);
+
+            // scan for vacu pathces from 2022/13/01
+            saveDataPtrAddress = scanner.Scan(vars.saveDataScanTargetVacu);
+            if (saveDataPtrAddress != IntPtr.Zero) {
+                vars.saveDataPtrType = "DLCPtr";
+                break;
+            }
 
             // scan for DLC patches
             saveDataPtrAddress = scanner.Scan(vars.saveDataScanTargetDLC);
@@ -625,6 +638,8 @@ split {
                 vars.chapter.Current == 97 && vars.chapter.Old != 97 && settings["splits_dwbth"] && (settings["splits_dwbth_doubleSplitNo"] && vars.splitsLock.ElapsedMilliseconds > 9000 || !settings["splits_dwbth_doubleSplitNo"])  // death wish back to hub
                 ||
                 vars.yarn.Current == vars.yarn.Old + 1 && settings["splits_yarn"] // yarn
+                ||
+                vars.checkpoint.Current != vars.checkpoint.Old && vars.checkpoint.Current != 0 && settings["splits_checkpoint"] // checkpoint
                 )
             ||
             settings["manySplits"] && vars.currentRift == "none"
